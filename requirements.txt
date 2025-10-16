@@ -1,0 +1,33 @@
+# Visionary Project Dependencies
+# CS4398 Group 3
+
+# Core dependencies
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Hardware communication
+pyserial>=3.5
+
+# Machine Learning and AI
+tensorflow>=2.13.0
+torch>=2.0.0
+transformers>=4.30.0
+
+# GUI framework
+tkinter  # Usually included with Python
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Optional: For advanced computer vision
+
+
+# Optional: For enhanced GUI
+
+
+# Optional: For web interface
+
+
+# Optional: For data visualization
