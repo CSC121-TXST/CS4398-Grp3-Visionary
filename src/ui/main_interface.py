@@ -18,6 +18,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from ui.style import apply_theme, style_menu, add_video_grid, ACCENT
 from ui.control_panel import ControlPanel
+from vision.camera_control import SimpleCamera
+
 
 class _Mountable(ttk.Frame):
     """Simple placeholder used when real panels are not yet implemented."""
@@ -87,11 +89,21 @@ class VisionaryApp(tk.Tk):
         self.video_frame = ttk.LabelFrame(main, text="Video Feed")
         self.video_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(0, 10))
         self._video_canvas = add_video_grid(self.video_frame)
+        self.camera = SimpleCamera(
+            canvas=self._video_canvas,
+            index=0,
+            mirror=True,
+            on_fps=lambda f: self.var_fps.set(f"FPS: {f:4.1f}")
+        )
 
         # Right: Control Panel
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
         self.control_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
-        self._control_widget = ControlPanel(self.control_frame)
+        self._control_widget = ControlPanel(
+            self.control_frame,
+            camera=self.camera,
+            on_status=lambda s: self.var_status.set(f"Status: {s}")
+        )
         self._control_widget.pack(expand=True, fill="both")
 
 

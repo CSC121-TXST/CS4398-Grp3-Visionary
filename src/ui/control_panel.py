@@ -13,8 +13,14 @@ from ui.style import ACCENT, ACCENT_2
 
 class ControlPanel(ttk.Frame):
     """Control panel for Visionary's right-side UI."""
-    def __init__(self, master=None):
+    def __init__(self, master=None, camera=None, on_status=None):
+        """
+        camera: object with start(), stop(), is_running()
+        on_status: optional callback(str) to update app status bar
+        """
         super().__init__(master, padding=10)
+        self.camera = camera
+        self.on_status = on_status or (lambda s: None)
         self._build_layout()
 
     # Layout
@@ -72,15 +78,27 @@ class ControlPanel(ttk.Frame):
         # Placeholder for advanced controls
         ttk.Label(self, text="[Additional controls coming soon...]", foreground="#666").pack(anchor="w", pady=(10, 0))
 
-    # Placeholder Methods
+    # Functioning Methods
+        # ---- Callbacks ----
     def _start_camera(self):
-        self.status_text.set("Camera started.")
-        messagebox.showinfo("Visionary", "Camera started (placeholder).")
+        if not self.camera:
+            messagebox.showerror("Visionary", "Camera not available.")
+            return
+        try:
+            self.camera.start()
+            self.status_text.set("Camera started.")
+            self.on_status("Camera: ON")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Failed to start camera:\n{e}")
 
     def _stop_camera(self):
+        if not self.camera:
+            return
+        self.camera.stop()
         self.status_text.set("Camera stopped.")
-        messagebox.showinfo("Visionary", "Camera stopped (placeholder).")
+        self.on_status("Camera: OFF")
 
+    # Placeholder Methods
     def _connect_hardware(self):
         self.status_text.set("Attempting hardware connection...")
         messagebox.showinfo("Visionary", "Hardware connection attempt (placeholder).")
