@@ -1,84 +1,101 @@
 """
 Main Interface Module
 
-This module provides the main user interface for the Visionary system, integrating all 
-components into a cohesive user experience.
+Provides the main user interface for the Visionary system.
 
-This file defines ONLY the window layout to match the project wireframe:
-- Menubar: File, Settings, Help (top)
-- Centered title label: "Visionary" just under the menubar
-- Main split: left Video Feed area, right Control Panel area
-- Footer status bar with segments: Laser, Servo, Status, FPS
+Layout:
+- Custom dark header bar: File, Settings, Help
+- Centered title label: "Visionary"
+- Main area split: Video Feed (left), Control Panel (right)
+- Footer status bar: Laser, Servo, Status, FPS
 
-No camera, no hardware, no buttons. These areas are "slots" where real widgets can be mounted 
-later (e.g., ui/video_panel.py, ui/control_panel.py).
-
+No camera, hardware, or buttons are implemented here.
+These areas act as "slots" for mounting real widgets later
+(e.g., ui/video_panel.py, ui/control_panel.py).
 """
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from ui.style import apply_theme, style_menu, add_video_grid, ACCENT
+
 class _Mountable(ttk.Frame):
-    """Fallback stub used when real panels are not present."""
+    """Simple placeholder used when real panels are not yet implemented."""
     def __init__(self, master, text: str):
         super().__init__(master)
         lbl = ttk.Label(self, text=text, anchor="center")
         lbl.pack(expand=True, fill="both", padx=12, pady=12)
 
+
 class VisionaryApp(tk.Tk):
+    """Main Tkinter window for the Visionary application."""
     def __init__(self):
         super().__init__()
         self.title("Visionary")
         self.geometry("1100x650")
         self.minsize(980, 560)
 
-        try:
-            ttk.Style().theme_use("clam")
-        except Exception:
-            pass
+        # Apply dark theme before creating widgets
+        apply_theme(self)
 
+        # Build interface
         self._build_menubar()
+        self._build_title()
+        self._build_main_area()
+        self._build_statusbar()
 
-        title = ttk.Label(self, text="Visionary", font=("Segoe UI", 16, "bold"))
+    def _build_menubar(self):
+        header = ttk.Frame(self, padding=(10, 6))
+        header.pack(side=tk.TOP, fill="x")
+
+        def make_menu_button(parent, text):
+            mb = ttk.Menubutton(parent, text=text)
+            menu = tk.Menu(mb, tearoff=0)
+            style_menu(menu)
+            mb["menu"] = menu
+            mb.pack(side="left", padx=(0, 12))
+            return menu
+
+        file_menu = make_menu_button(header, "File")
+        file_menu.add_command(label="Exit", command=self.on_exit)
+
+        settings_menu = make_menu_button(header, "Settings")
+        # Chris To-Do: add settings_menu.add_checkbutton(...)
+
+        help_menu = make_menu_button(header, "Help")
+        help_menu.add_command(label="About", command=self._show_about)
+
+    def _build_title(self):
+        """Places the centered Visionary title label."""
+        title = ttk.Label(
+            self,
+            text="Visionary",
+            font=("Consolas", 18, "bold"),
+            foreground=ACCENT
+        )
         title.pack(side=tk.TOP, pady=(6, 6))
 
+    def _build_main_area(self):
+        """Constructs the main layout with video and control panels."""
         main = ttk.Frame(self)
         main.pack(side=tk.TOP, fill="both", expand=True)
         main.grid_columnconfigure(0, weight=3)
         main.grid_columnconfigure(1, weight=2)
         main.grid_rowconfigure(0, weight=1)
 
+        # Left: Video Feed
         self.video_frame = ttk.LabelFrame(main, text="Video Feed")
-        self.video_frame.grid(row=0, column=0, sticky="nsew", padx=(10,5), pady=(0,10))
+        self.video_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(0, 10))
+        self._video_canvas = add_video_grid(self.video_frame)
 
+        # Right: Control Panel
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
-        self.control_frame.grid(row=0, column=1, sticky="nsew", padx=(5,10), pady=(0,10))
-
-        self._video_widget = _Mountable(self.video_frame, "Video panel goes here…")
-        self._video_widget.pack(expand=True, fill="both")
-
+        self.control_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
         self._control_widget = _Mountable(self.control_frame, "Controls go here…")
         self._control_widget.pack(expand=True, fill="both")
 
-        self._build_statusbar()
-
-    def _build_menubar(self):
-        mb = tk.Menu(self)
-
-        file_menu = tk.Menu(mb, tearoff=0)
-        file_menu.add_command(label="Exit", command=self.on_exit)
-        mb.add_cascade(label="File", menu=file_menu)
-
-        settings_menu = tk.Menu(mb, tearoff=0)
-        # (settings items to be added later)
-        mb.add_cascade(label="Settings", menu=settings_menu)
-
-        help_menu = tk.Menu(mb, tearoff=0)
-        help_menu.add_command(label="About", command=self._show_about)
-        mb.add_cascade(label="Help", menu=help_menu)
-
-        self.config(menu=mb)
-
     def _build_statusbar(self):
+        """Creates the footer status bar with key telemetry values."""
         bar = ttk.Frame(self, padding=(8, 4))
         bar.pack(side=tk.BOTTOM, fill="x")
 
@@ -87,7 +104,6 @@ class VisionaryApp(tk.Tk):
         self.var_status = tk.StringVar(value="Status: Idle")
         self.var_fps = tk.StringVar(value="FPS: —")
 
-        # Four evenly spaced labels
         for i in range(4):
             bar.grid_columnconfigure(i, weight=1)
 
@@ -97,17 +113,18 @@ class VisionaryApp(tk.Tk):
         ttk.Label(bar, textvariable=self.var_fps, anchor="e").grid(row=0, column=3, sticky="e")
 
     def _show_about(self):
+        """Displays About dialog."""
         messagebox.showinfo(
-            "About Visionary\n",
-            "Visionary – CS4398 Group 3\n"
-            "Wireframe-aligned Tkinter skeleton.\n"
+            "About Visionary",
+            "Visionary – CS4398 Group 3\n\n"
+            "Wireframe-aligned Tkinter skeleton (dark theme).\n"
             "This layout provides mount points for video and controls."
         )
 
     def on_exit(self):
+        """Safely close the application."""
         self.destroy()
 
-# Local launcher for direct run
 if __name__ == "__main__":
     app = VisionaryApp()
     app.mainloop()
