@@ -16,8 +16,8 @@ These areas act as "slots" for mounting real widgets later
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-
 from ui.style import apply_theme, style_menu, add_video_grid, ACCENT
+from ui.control_panel import ControlPanel
 
 class _Mountable(ttk.Frame):
     """Simple placeholder used when real panels are not yet implemented."""
@@ -91,8 +91,10 @@ class VisionaryApp(tk.Tk):
         # Right: Control Panel
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
         self.control_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
-        self._control_widget = _Mountable(self.control_frame, "Controls go here…")
+        self._control_widget = ControlPanel(self.control_frame)
         self._control_widget.pack(expand=True, fill="both")
+
+
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""
@@ -126,5 +128,11 @@ class VisionaryApp(tk.Tk):
         self.destroy()
 
 if __name__ == "__main__":
+    from ui.control_panel import ControlPanel
+
     app = VisionaryApp()
+
+    panel = ControlPanel(app.control_frame)
+    panel.pack(expand=True, fill="both")
+
     app.mainloop()
