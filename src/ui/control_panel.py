@@ -25,6 +25,8 @@ class ControlPanel(ttk.Frame):
         self.on_laser = on_laser or (lambda on: None)
         self._led_state = False  # for toggle button behavior
         self._build_layout()
+        self._connected_controls = None  # frame that holds LED buttons after connect
+
 
     # Layout
     def _build_layout(self):
@@ -105,6 +107,14 @@ class ControlPanel(ttk.Frame):
         if not self.arduino:
             messagebox.showerror("Visionary", "Arduino controller not available.")
             return
+
+        # If already connected, just render controls and bail
+        if self.arduino.is_connected():
+            self.status_text.set("Arduino already connected.")
+            self.on_status("Hardware: connected")
+            self._show_connected_controls()
+            return
+
         self.status_text.set("Connecting to Arduino…")
         self.on_status("Hardware: connecting…")
         self.connect_btn.configure(state="disabled")
@@ -120,13 +130,14 @@ class ControlPanel(ttk.Frame):
         if ok:
             self.status_text.set("Arduino connected.")
             self.on_status("Hardware: connected")
-            # Proof-of-life: turn the LED on for ~1.2s then off
+            # Proof-of-life: LED on ~1.2s then off
             self._led_on()
             self.after(1200, self._led_off_then_ready)
         else:
             self.status_text.set("Arduino not found.")
             self.on_status("Hardware: not found")
             self.connect_btn.configure(state="normal")
+
 
     def _led_on(self):
         try:
@@ -148,9 +159,109 @@ class ControlPanel(ttk.Frame):
         self._led_off()
         self.status_text.set("Proof-of-life complete. Ready.")
         self.on_status("Hardware: ready")
-        self.connect_btn.configure(state="normal")
+
+        # Only touch the button if it still exists
+        if getattr(self, "connect_btn", None) is not None:
+            try:
+                self.connect_btn.configure(state="normal")
+            except Exception:
+                pass
+
+        # Now replace the button with the LED controls (if not already shown)
+        if not self._connected_controls:
+            self._show_connected_controls()
 
     # Placeholder Methods
     def _test_laser(self):
         self.status_text.set("Testing laser module...")
         messagebox.showinfo("Visionary", "Laser test initiated (placeholder).")
+
+    def _show_connected_controls(self):
+        # Already built? just ensure visible and return
+        if self._connected_controls:
+            try:
+                self._connected_controls.pack_forget()
+            except Exception:
+                pass
+
+        # Remove the connect button once connected
+        if getattr(self, "connect_btn", None):
+            try:
+                self.connect_btn.destroy()
+            except Exception:
+                pass
+            self.connect_btn = None
+
+        # Build the LED/Disconnect button group
+        self._connected_controls = ttk.Frame(self)
+        self._connected_controls.pack(fill="x", pady=(0, 15))
+
+        ttk.Button(
+            self._connected_controls, text="💡 LED ON",
+            style="Accent.TButton", command=self._led_on
+        ).pack(fill="x", pady=4)
+
+        ttk.Button(
+            self._connected_controls, text="💤 LED OFF",
+            style="Accent.TButton", command=self._led_off
+        ).pack(fill="x", pady=4)
+
+        ttk.Button(
+            self._connected_controls, text="✨ Blink (x3)",
+            style="Accent.TButton", command=self._blink_led
+        ).pack(fill="x", pady=4)
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=8)
+
+        ttk.Button(
+            self._connected_controls, text="⏏ Disconnect",
+            style="Accent.TButton", command=self._disconnect_hardware
+        ).pack(fill="x", pady=4)
+
+    def _blink_led(self):
+        if not self.arduino or not self.arduino.is_connected():
+            messagebox.showwarning("Visionary", "Arduino not connected.")
+            return
+        try:
+            self.status_text.set("Blinking LED…")
+            self.on_status("LED: blinking")
+            # non-blocking feel: do quick blink without freezing UI
+            # (blink() itself sleeps; for a super-smooth UI you could thread it later)
+            self.after(10, lambda: self._safe_blink())
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Blink failed:\n{e}")
+
+    def _safe_blink(self):
+        try:
+            self.arduino.blink(times=3, interval_s=0.25)
+            self.status_text.set("Blink complete.")
+            self.on_status("LED: idle")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Blink failed:\n{e}")
+
+    def _disconnect_hardware(self):
+        if self.arduino and self.arduino.is_connected():
+            try:
+                self.arduino.disconnect()
+            except Exception as e:
+                messagebox.showerror("Visionary", f"Disconnect failed:\n{e}")
+                return
+
+        self.status_text.set("Arduino disconnected.")
+        self.on_status("Hardware: disconnected")
+        self.on_laser(False)
+        self._led_state = False
+
+        # Remove connected controls and bring back Connect button
+        if self._connected_controls:
+            try:
+                self._connected_controls.destroy()
+            except Exception:
+                pass
+            self._connected_controls = None
+
+        self.connect_btn = ttk.Button(
+            self, text="🔌 Connect Hardware",
+            style="Accent.TButton", command=self._connect_hardware
+        )
+        self.connect_btn.pack(fill="x", pady=4)

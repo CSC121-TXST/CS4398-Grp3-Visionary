@@ -15,14 +15,25 @@ class ArduinoController:
         self.timeout = timeout
         self.port = port
 
+    def send_command(self, cmd: str):
+        """Send a newline-terminated command (matches readStringUntil('\\n') on Arduino)."""
+        if not self.arduino:
+            raise RuntimeError("Arduino not connected")
+        self.arduino.write((cmd + "\n").encode("utf-8"))
+
+    def is_connected(self) -> bool:
+        return bool(self.arduino) and getattr(self.arduino, "is_open", False)
+
     def connect(self) -> bool:
         """Open the serial port (auto-discover if port is not specified)."""
-        if self.port:
-            self.arduino = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
-            time.sleep(2)  # allow board reset
+        if self.is_connected():
             return True
 
-        # Try to auto-discover by description
+        if self.port:
+            self.arduino = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
+            time.sleep(2)
+            return True
+
         for p in serial.tools.list_ports.comports():
             if "Arduino" in p.description or "CH340" in p.description:
                 self.arduino = serial.Serial(p.device, self.baudrate, timeout=self.timeout)
@@ -30,11 +41,15 @@ class ArduinoController:
                 return True
         return False
 
-    def send_command(self, cmd: str):
-        """Send a newline-terminated command (matches readStringUntil('\\n') on Arduino)."""
-        if not self.arduino:
+    def blink(self, times: int = 3, interval_s: float = 0.3):
+        """Convenience helper: blink the LED via commands."""
+        if not self.is_connected():
             raise RuntimeError("Arduino not connected")
-        self.arduino.write((cmd + "\n").encode("utf-8"))
+        for _ in range(times):
+            self.send_command("LED_ON")
+            time.sleep(interval_s)
+            self.send_command("LED_OFF")
+            time.sleep(interval_s)
 
     def disconnect(self):
         if self.arduino:
