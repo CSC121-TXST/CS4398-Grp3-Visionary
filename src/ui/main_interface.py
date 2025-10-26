@@ -130,9 +130,10 @@ class VisionaryApp(tk.Tk):
         """Displays About dialog."""
         messagebox.showinfo(
             "About Visionary",
-            "Visionary – CS4398 Group 3\n\n"
+            "Visionary 0.1 UI Release – CS4398 Group 3\n\n"
             "Wireframe-aligned Tkinter skeleton (dark theme).\n"
-            "This layout provides mount points for video and controls."
+            "This layout provides mount points for video and controls.\n"
+            "Looking to implement a Theme Switch option after incorporating more Hardware control"
         )
 
     def on_exit(self):
