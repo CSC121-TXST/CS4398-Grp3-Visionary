@@ -1,6 +1,28 @@
 # Visionary Project .gitignore
 # CS4398 Group 3
 
-# Python
+# Python bytecode and cache
 __pycache__/
 *.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.env/
+
+# Build and distribution
+build/
+dist/
+*.spec
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+*.tmp

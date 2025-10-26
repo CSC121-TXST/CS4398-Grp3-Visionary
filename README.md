@@ -31,7 +31,7 @@ Visionary is a comprehensive system that integrates a USB webcam with Arduino-co
 5. **User Experience**: Design an intuitive interface for system control and monitoring
 
 ### Technical Milestones
-- [ ] Establish stable USB webcam communication
+- [X] Establish stable USB webcam communication
 - [ ] Implement Arduino-servo motor control system
 - [ ] Develop object detection algorithms
 - [ ] Create autonomous tracking functionality
@@ -123,6 +123,8 @@ Visionary/
 3. Upload Arduino code to microcontroller
 4. Connect hardware components
 5. Run the main application: `python src/main.py`
+    +6. (Optional) Double-click `RunVisionary.bat` for quick launch
+
 
 ## Group Members
 

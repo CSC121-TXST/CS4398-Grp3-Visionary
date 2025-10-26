@@ -2,32 +2,21 @@
 # CS4398 Group 3
 
 # Core dependencies
-opencv-python>=4.8.0
-numpy>=1.24.0
+opencv-python>=4.9.0
+numpy>=1.25.0
 Pillow>=10.0.0
 
-# Hardware communication
+# Hardware communication (future)
 pyserial>=3.5
 
-# Machine Learning and AI
+# Machine Learning / LLM (planned)
 tensorflow>=2.13.0
 torch>=2.0.0
 transformers>=4.30.0
 
-# GUI framework
-tkinter  # Usually included with Python
+# GUI Framework (Tkinter included with Python)
+# (No install required for most systems right now)
 
-# Development and testing
+# Testing & Dev Tools
 pytest>=7.4.0
 pytest-cov>=4.1.0
-
-# Optional: For advanced computer vision
-
-
-# Optional: For enhanced GUI
-
-
-# Optional: For web interface
-
-
-# Optional: For data visualization
