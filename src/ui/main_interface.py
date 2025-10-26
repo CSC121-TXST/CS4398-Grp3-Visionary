@@ -19,6 +19,8 @@ from tkinter import ttk, messagebox
 from ui.style import apply_theme, style_menu, add_video_grid, ACCENT
 from ui.control_panel import ControlPanel
 from vision.camera_control import SimpleCamera
+from hardware.arduino_controller import ArduinoController
+
 
 
 class _Mountable(ttk.Frame):
@@ -95,6 +97,8 @@ class VisionaryApp(tk.Tk):
             mirror=True,
             on_fps=lambda f: self.var_fps.set(f"FPS: {f:4.1f}")
         )
+        
+        self.arduino = ArduinoController()
 
         # Right: Control Panel
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
@@ -102,7 +106,9 @@ class VisionaryApp(tk.Tk):
         self._control_widget = ControlPanel(
             self.control_frame,
             camera=self.camera,
-            on_status=lambda s: self.var_status.set(f"Status: {s}")
+            arduino=self.arduino,
+            on_status=lambda s: self.var_status.set(f"Status: {s}"),
+            on_laser=lambda on: self.var_laser.set(f"Laser: {'ON' if on else 'OFF'}")
         )
         self._control_widget.pack(expand=True, fill="both")
 
@@ -138,14 +144,18 @@ class VisionaryApp(tk.Tk):
 
     def on_exit(self):
         """Safely close the application."""
+        try:
+            if hasattr(self, "camera") and self.camera.is_running():
+                self.camera.stop()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "arduino") and self.arduino:
+                self.arduino.disconnect()
+        except Exception:
+            pass
         self.destroy()
 
 if __name__ == "__main__":
-    from ui.control_panel import ControlPanel
-
     app = VisionaryApp()
-
-    panel = ControlPanel(app.control_frame)
-    panel.pack(expand=True, fill="both")
-
     app.mainloop()

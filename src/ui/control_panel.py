@@ -13,7 +13,7 @@ from ui.style import ACCENT, ACCENT_2
 
 class ControlPanel(ttk.Frame):
     """Control panel for Visionary's right-side UI."""
-    def __init__(self, master=None, camera=None, on_status=None):
+    def __init__(self, master=None, camera=None, arduino=None, on_status=None, on_laser=None):
         """
         camera: object with start(), stop(), is_running()
         on_status: optional callback(str) to update app status bar
@@ -21,6 +21,9 @@ class ControlPanel(ttk.Frame):
         super().__init__(master, padding=10)
         self.camera = camera
         self.on_status = on_status or (lambda s: None)
+        self.arduino = arduino
+        self.on_laser = on_laser or (lambda on: None)
+        self._led_state = False  # for toggle button behavior
         self._build_layout()
 
     # Layout
@@ -98,11 +101,56 @@ class ControlPanel(ttk.Frame):
         self.status_text.set("Camera stopped.")
         self.on_status("Camera: OFF")
 
-    # Placeholder Methods
     def _connect_hardware(self):
-        self.status_text.set("Attempting hardware connection...")
-        messagebox.showinfo("Visionary", "Hardware connection attempt (placeholder).")
+        if not self.arduino:
+            messagebox.showerror("Visionary", "Arduino controller not available.")
+            return
+        self.status_text.set("Connecting to Arduino…")
+        self.on_status("Hardware: connecting…")
+        self.connect_btn.configure(state="disabled")
+        self.after(50, self._do_connect)
 
+    def _do_connect(self):
+        try:
+            ok = self.arduino.connect()
+        except Exception as e:
+            ok = False
+            messagebox.showerror("Visionary", f"Arduino connect failed:\n{e}")
+
+        if ok:
+            self.status_text.set("Arduino connected.")
+            self.on_status("Hardware: connected")
+            # Proof-of-life: turn the LED on for ~1.2s then off
+            self._led_on()
+            self.after(1200, self._led_off_then_ready)
+        else:
+            self.status_text.set("Arduino not found.")
+            self.on_status("Hardware: not found")
+            self.connect_btn.configure(state="normal")
+
+    def _led_on(self):
+        try:
+            self.arduino.send_command("LED_ON")
+            self._led_state = True
+            self.on_laser(True)
+        except Exception as e:
+            messagebox.showerror("Visionary", f"LED_ON failed:\n{e}")
+
+    def _led_off(self):
+        try:
+            self.arduino.send_command("LED_OFF")
+            self._led_state = False
+            self.on_laser(False)
+        except Exception as e:
+            messagebox.showerror("Visionary", f"LED_OFF failed:\n{e}")
+
+    def _led_off_then_ready(self):
+        self._led_off()
+        self.status_text.set("Proof-of-life complete. Ready.")
+        self.on_status("Hardware: ready")
+        self.connect_btn.configure(state="normal")
+
+    # Placeholder Methods
     def _test_laser(self):
         self.status_text.set("Testing laser module...")
         messagebox.showinfo("Visionary", "Laser test initiated (placeholder).")
