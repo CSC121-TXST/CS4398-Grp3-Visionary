@@ -6,7 +6,7 @@ import serial.tools.list_ports
 class ArduinoController:
     def __init__(self, baudrate=9600, timeout=2, port=None):
         """
-        baudrate: must match Serial.begin(...) in your Arduino sketch (9600)
+        baudrate: must match Serial.begin(...) in Arduino sketch (9600)
         timeout: read timeout in seconds
         port: optional explicit COM port (e.g., "COM3"); if None we auto-discover
         """
