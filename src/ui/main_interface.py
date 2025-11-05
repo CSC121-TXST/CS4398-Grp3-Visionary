@@ -85,7 +85,12 @@ class VisionaryApp(BaseTk):
         ttk.Label(video, text="Video Feed", style="Section.TLabel").pack(anchor="w", padx=8, pady=(8, 6))
         wrap = ttk.Frame(video)
         wrap.pack(expand=True, fill="both", padx=8, pady=8)
-        self._video_canvas = tk.Canvas(wrap, highlightthickness=0)
+        self._video_canvas = tk.Canvas(
+            wrap,
+            bg="#1e2630",
+            highlightthickness=0,
+            bd=0
+        )
         self._video_canvas.pack(expand=True, fill="both")
 
         self.camera = SimpleCamera(canvas=self._video_canvas, index=0, mirror=True)
