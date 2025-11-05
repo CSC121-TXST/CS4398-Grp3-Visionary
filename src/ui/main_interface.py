@@ -17,14 +17,13 @@ These areas act as "slots" for mounting real widgets later
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-# Theme
 try:
     from ttkthemes import ThemedTk
     BaseTk = ThemedTk
 except:
     BaseTk = tk.Tk
 
-from ui.style import apply_theme, style_menu, DEFAULT_THEME
+from ui.style import apply_theme, style_menu, DEFAULT_THEME, SEC_SURF
 from ui.control_panel import ControlPanel
 from vision.camera_control import SimpleCamera
 
@@ -32,15 +31,11 @@ class VisionaryApp(BaseTk):
     def __init__(self):
         super().__init__()
 
-        # Window
         self.title("Visionary")
         self.geometry("1200x720")
         self.minsize(1040, 600)
-
-        # Theme
         apply_theme(self, DEFAULT_THEME)
 
-        # UI
         self._build_header()
         self._build_main_area()
         self._build_statusbar()
@@ -72,44 +67,52 @@ class VisionaryApp(BaseTk):
         help_menu = menu_btn("Help")
         help_menu.add_command(label="About", command=self._show_about)
 
-    # Body
+    # Sidebar + Video Area
     def _build_main_area(self):
-        main = ttk.Frame(self, padding=12)
+        main = ttk.Frame(self, padding=0)
         main.pack(fill="both", expand=True)
-        main.grid_columnconfigure(0, weight=5)
-        main.grid_columnconfigure(1, weight=3)
+
+        main.grid_columnconfigure(0, weight=0, minsize=320)
+        main.grid_columnconfigure(1, weight=1)
         main.grid_rowconfigure(0, weight=1)
 
-        video = ttk.Frame(main)
-        video.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        ttk.Label(video, text="Video Feed", style="Section.TLabel").pack(anchor="w", padx=8, pady=(8, 6))
-        wrap = ttk.Frame(video)
-        wrap.pack(expand=True, fill="both", padx=8, pady=8)
-        self._video_canvas = tk.Canvas(
-            wrap,
-            bg="#1e2630",
-            highlightthickness=0,
-            bd=0
-        )
-        self._video_canvas.pack(expand=True, fill="both")
+        sidebar = ttk.Frame(main, padding=(12, 12, 12, 12))
+        sidebar.grid(row=0, column=0, sticky="nswe")
+        sidebar.grid_propagate(False)
 
-        self.camera = SimpleCamera(canvas=self._video_canvas, index=0, mirror=True)
+        ttk.Label(sidebar, text="Controls", style="Section.TLabel").pack(anchor="w", pady=(0, 8))
 
-        controls = ttk.Frame(main)
-        controls.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
-        ttk.Label(controls, text="Controls", style="Section.TLabel").pack(anchor="w", padx=8, pady=(8, 6))
-        panel = ttk.Frame(controls)
-        panel.pack(expand=True, fill="both", padx=8, pady=8)
+        controls_container = ttk.Frame(sidebar)
+        controls_container.pack(fill="both", expand=True)
 
         self._control = ControlPanel(
-            panel,
-            camera=self.camera,
+            controls_container,
+            camera=None,
             on_status=self._set_status,
             on_laser=self._set_laser,
             on_servo=self._set_servo,
             on_fps=self._set_fps,
         )
         self._control.pack(fill="both", expand=True)
+
+        content = ttk.Frame(main, padding=(12, 12, 12, 12))
+        content.grid(row=0, column=1, sticky="nswe")
+
+        ttk.Label(content, text="Video Feed", style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+
+        video_wrap = ttk.Frame(content)
+        video_wrap.pack(expand=True, fill="both")
+
+        self._video_canvas = tk.Canvas(
+            video_wrap,
+            bg=SEC_SURF,
+            highlightthickness=0,
+            bd=0
+        )
+        self._video_canvas.pack(expand=True, fill="both")
+
+        self.camera = SimpleCamera(canvas=self._video_canvas, index=0, mirror=True)
+        self._control.camera = self.camera
 
     # Status Bar
     def _build_statusbar(self):
@@ -131,21 +134,15 @@ class VisionaryApp(BaseTk):
         ttk.Label(bar, textvariable=self.var_status).grid(row=0, column=2, sticky="w")
         ttk.Label(bar, textvariable=self.var_fps).grid(row=0, column=3, sticky="e")
 
-    # Setters
+    # API to Status Bar
     def _set_laser(self, text): self.var_laser.set(text)
     def _set_servo(self, text): self.var_servo.set(text)
     def _set_status(self, text): self.var_status.set(text)
     def _set_fps(self, text): self.var_fps.set(text)
 
-    # Actions
-    def _open_settings(self):
-        messagebox.showinfo("Settings", "Preferences go here.")
-
-    def _show_about(self):
-        messagebox.showinfo("About", "Visionary")
-
-    def on_exit(self):
-        self.destroy()
+    def _open_settings(self): messagebox.showinfo("Settings", "Preferences go here.")
+    def _show_about(self): messagebox.showinfo("About", "Visionary")
+    def on_exit(self): self.destroy()
 
 if __name__ == "__main__":
     VisionaryApp().mainloop()

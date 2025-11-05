@@ -33,6 +33,7 @@ class ControlPanel(ttk.Frame):
         ttk.Button(box, text="Test Laser", command=self._laser).pack(fill="x", pady=4)
 
         ttk.Separator(self).pack(fill="x", pady=12)
+
         ttk.Label(self, text="Status").pack(anchor="w")
         self.status = tk.StringVar(value="Idle")
         ttk.Label(self, textvariable=self.status).pack(anchor="w", pady=(4, 0))
@@ -74,7 +75,6 @@ class ControlPanel(ttk.Frame):
         messagebox.showinfo("Laser", "Laser test triggered.")
         self.on_laser("Laser: OFF")
 
-    # Helpers
     def _emit_status(self, text):
         self.status.set(text.replace("Status: ", ""))
         self.on_status(text)
