@@ -17,6 +17,8 @@ transformers>=4.30.0
 # GUI Framework (Tkinter included with Python)
 # (No install required for most systems right now)
 
+ttkthemes>=3.2.2
+
 # Testing & Dev Tools
 pytest>=7.4.0
 pytest-cov>=4.1.0
