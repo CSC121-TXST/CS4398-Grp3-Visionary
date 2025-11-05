@@ -9,100 +9,72 @@ This file is independent and mountable into main_interface.py.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from ui.style import ACCENT, ACCENT_2
 
 class ControlPanel(ttk.Frame):
-    """Control panel for Visionary's right-side UI."""
-    def __init__(self, master=None, camera=None, on_status=None):
-        """
-        camera: object with start(), stop(), is_running()
-        on_status: optional callback(str) to update app status bar
-        """
-        super().__init__(master, padding=10)
+    def __init__(self, master=None, camera=None, on_status=None, on_laser=None, on_servo=None, on_fps=None):
+        super().__init__(master)
         self.camera = camera
         self.on_status = on_status or (lambda s: None)
-        self._build_layout()
+        self.on_laser = on_laser or (lambda s: None)
+        self.on_servo = on_servo or (lambda s: None)
+        self.on_fps = on_fps or (lambda s: None)
+        self._build()
 
     # Layout
-    def _build_layout(self):
-        # Section title
-        header = ttk.Label(
-            self, text="System Controls",
-            font=("Consolas", 13, "bold"), foreground=ACCENT
-        )
-        header.pack(anchor="w", pady=(0, 10))
+    def _build(self):
+        ttk.Label(self, text="System Controls", style="Section.TLabel").pack(anchor="w", pady=(0, 8))
 
-        # Buttons container
-        btns = ttk.Frame(self)
-        btns.pack(fill="x", pady=(0, 15))
+        box = ttk.Frame(self)
+        box.pack(fill="x", pady=(0, 12))
 
-        self.start_btn = ttk.Button(
-            btns, text="▶ Start Camera",
-            style="Accent.TButton", command=self._start_camera
-        )
-        self.start_btn.pack(fill="x", pady=4)
+        ttk.Button(box, text="Start Camera", command=self._start).pack(fill="x", pady=4)
+        ttk.Button(box, text="Stop Camera", command=self._stop).pack(fill="x", pady=4)
+        ttk.Button(box, text="Connect Hardware", command=self._hardware).pack(fill="x", pady=4)
+        ttk.Button(box, text="Test Laser", command=self._laser).pack(fill="x", pady=4)
 
-        self.stop_btn = ttk.Button(
-            btns, text="■ Stop Camera",
-            style="Accent.TButton", command=self._stop_camera
-        )
-        self.stop_btn.pack(fill="x", pady=4)
+        ttk.Separator(self).pack(fill="x", pady=12)
+        ttk.Label(self, text="Status").pack(anchor="w")
+        self.status = tk.StringVar(value="Idle")
+        ttk.Label(self, textvariable=self.status).pack(anchor="w", pady=(4, 0))
 
-        self.connect_btn = ttk.Button(
-            btns, text="🔌 Connect Hardware",
-            style="Accent.TButton", command=self._connect_hardware
-        )
-        self.connect_btn.pack(fill="x", pady=4)
-
-        self.laser_btn = ttk.Button(
-            btns, text="💡 Test Laser",
-            style="Accent.TButton", command=self._test_laser
-        )
-        self.laser_btn.pack(fill="x", pady=4)
-
-        # Separator
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
-
-        # Status labels
-        status_header = ttk.Label(
-            self, text="System Status",
-            font=("Consolas", 12, "bold"), foreground=ACCENT_2
-        )
-        status_header.pack(anchor="w", pady=(0, 6))
-
-        self.status_text = tk.StringVar(value="Idle")
-        ttk.Label(self, textvariable=self.status_text, foreground="#9aa4b1").pack(anchor="w")
-
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
-
-        # Placeholder for advanced controls
-        ttk.Label(self, text="[Additional controls coming soon...]", foreground="#666").pack(anchor="w", pady=(10, 0))
-
-    # Functioning Methods
-        # ---- Callbacks ----
-    def _start_camera(self):
+    # Actions
+    def _start(self):
         if not self.camera:
-            messagebox.showerror("Visionary", "Camera not available.")
+            messagebox.showerror("Error", "Camera unavailable.")
+            self._emit_status("Status: Camera unavailable")
             return
         try:
+            self._emit_status("Status: Starting camera…")
             self.camera.start()
-            self.status_text.set("Camera started.")
-            self.on_status("Camera: ON")
+            self._emit_status("Status: Camera started")
+            self.on_fps("FPS: —")
         except Exception as e:
-            messagebox.showerror("Visionary", f"Failed to start camera:\n{e}")
+            messagebox.showerror("Error", str(e))
+            self._emit_status("Status: Start failed")
 
-    def _stop_camera(self):
+    def _stop(self):
         if not self.camera:
+            self._emit_status("Status: No camera to stop")
             return
-        self.camera.stop()
-        self.status_text.set("Camera stopped.")
-        self.on_status("Camera: OFF")
+        try:
+            self.camera.stop()
+            self._emit_status("Status: Camera stopped")
+            self.on_fps("FPS: —")
+        except Exception as e:
+            messagebox.showwarning("Warning", str(e))
+            self._emit_status("Status: Stop issue")
 
-    # Placeholder Methods
-    def _connect_hardware(self):
-        self.status_text.set("Attempting hardware connection...")
-        messagebox.showinfo("Visionary", "Hardware connection attempt (placeholder).")
+    def _hardware(self):
+        messagebox.showinfo("Hardware", "Connect request sent.")
+        self._emit_status("Status: Hardware request sent")
+        self.on_servo("Servo: Pan 0°, Tilt 0°")
 
-    def _test_laser(self):
-        self.status_text.set("Testing laser module...")
-        messagebox.showinfo("Visionary", "Laser test initiated (placeholder).")
+    def _laser(self):
+        self.on_laser("Laser: ON")
+        messagebox.showinfo("Laser", "Laser test triggered.")
+        self.on_laser("Laser: OFF")
+
+    # Helpers
+    def _emit_status(self, text):
+        self.status.set(text.replace("Status: ", ""))
+        self.on_status(text)

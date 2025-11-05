@@ -16,135 +16,131 @@ These areas act as "slots" for mounting real widgets later
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from ui.style import apply_theme, style_menu, add_video_grid, ACCENT
+
+# Theme
+try:
+    from ttkthemes import ThemedTk
+    BaseTk = ThemedTk
+except:
+    BaseTk = tk.Tk
+
+from ui.style import apply_theme, style_menu, DEFAULT_THEME
 from ui.control_panel import ControlPanel
 from vision.camera_control import SimpleCamera
 
-
-class _Mountable(ttk.Frame):
-    """Simple placeholder used when real panels are not yet implemented."""
-    def __init__(self, master, text: str):
-        super().__init__(master)
-        lbl = ttk.Label(self, text=text, anchor="center")
-        lbl.pack(expand=True, fill="both", padx=12, pady=12)
-
-
-class VisionaryApp(tk.Tk):
-    """Main Tkinter window for the Visionary application."""
+class VisionaryApp(BaseTk):
     def __init__(self):
         super().__init__()
+
+        # Window
         self.title("Visionary")
-        self.geometry("1100x650")
-        self.minsize(980, 560)
+        self.geometry("1200x720")
+        self.minsize(1040, 600)
 
-        # Apply dark theme before creating widgets
-        apply_theme(self)
+        # Theme
+        apply_theme(self, DEFAULT_THEME)
 
-        # Build interface
-        self._build_menubar()
-        self._build_title()
+        # UI
+        self._build_header()
         self._build_main_area()
         self._build_statusbar()
 
-    def _build_menubar(self):
-        header = ttk.Frame(self, padding=(10, 6))
+    # Header
+    def _build_header(self):
+        header = ttk.Frame(self, padding=(12, 10))
         header.pack(side=tk.TOP, fill="x")
 
-        def make_menu_button(parent, text):
-            mb = ttk.Menubutton(parent, text=text)
-            menu = tk.Menu(mb, tearoff=0)
+        ttk.Label(header, text="Visionary", style="Title.TLabel").pack(side=tk.LEFT)
+
+        container = ttk.Frame(header)
+        container.pack(side=tk.RIGHT)
+
+        def menu_btn(label):
+            btn = ttk.Menubutton(container, text=label)
+            menu = tk.Menu(btn)
             style_menu(menu)
-            mb["menu"] = menu
-            mb.pack(side="left", padx=(0, 12))
+            btn["menu"] = menu
+            btn.pack(side="left", padx=8)
             return menu
 
-        file_menu = make_menu_button(header, "File")
+        file_menu = menu_btn("File")
         file_menu.add_command(label="Exit", command=self.on_exit)
 
-        settings_menu = make_menu_button(header, "Settings")
-        # Chris To-Do: add settings_menu.add_checkbutton(...)
+        settings_menu = menu_btn("Settings")
+        settings_menu.add_command(label="Preferences...", command=self._open_settings)
 
-        help_menu = make_menu_button(header, "Help")
+        help_menu = menu_btn("Help")
         help_menu.add_command(label="About", command=self._show_about)
 
-    def _build_title(self):
-        """Places the centered Visionary title label."""
-        title = ttk.Label(
-            self,
-            text="Visionary",
-            font=("Consolas", 18, "bold"),
-            foreground=ACCENT
-        )
-        title.pack(side=tk.TOP, pady=(6, 6))
-
+    # Body
     def _build_main_area(self):
-        """Constructs the main layout with video and control panels."""
-        main = ttk.Frame(self)
-        main.pack(side=tk.TOP, fill="both", expand=True)
-        main.grid_columnconfigure(0, weight=3)
-        main.grid_columnconfigure(1, weight=2)
+        main = ttk.Frame(self, padding=12)
+        main.pack(fill="both", expand=True)
+        main.grid_columnconfigure(0, weight=5)
+        main.grid_columnconfigure(1, weight=3)
         main.grid_rowconfigure(0, weight=1)
 
-        # Left: Video Feed
-        self.video_frame = ttk.LabelFrame(main, text="Video Feed")
-        self.video_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(0, 10))
-        self._video_canvas = add_video_grid(self.video_frame)
-        self.camera = SimpleCamera(
-            canvas=self._video_canvas,
-            index=0,
-            mirror=True,
-            on_fps=lambda f: self.var_fps.set(f"FPS: {f:4.1f}")
-        )
+        video = ttk.Frame(main)
+        video.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        ttk.Label(video, text="Video Feed", style="Section.TLabel").pack(anchor="w", padx=8, pady=(8, 6))
+        wrap = ttk.Frame(video)
+        wrap.pack(expand=True, fill="both", padx=8, pady=8)
+        self._video_canvas = tk.Canvas(wrap, highlightthickness=0)
+        self._video_canvas.pack(expand=True, fill="both")
 
-        # Right: Control Panel
-        self.control_frame = ttk.LabelFrame(main, text="Control Panel")
-        self.control_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
-        self._control_widget = ControlPanel(
-            self.control_frame,
+        self.camera = SimpleCamera(canvas=self._video_canvas, index=0, mirror=True)
+
+        controls = ttk.Frame(main)
+        controls.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        ttk.Label(controls, text="Controls", style="Section.TLabel").pack(anchor="w", padx=8, pady=(8, 6))
+        panel = ttk.Frame(controls)
+        panel.pack(expand=True, fill="both", padx=8, pady=8)
+
+        self._control = ControlPanel(
+            panel,
             camera=self.camera,
-            on_status=lambda s: self.var_status.set(f"Status: {s}")
+            on_status=self._set_status,
+            on_laser=self._set_laser,
+            on_servo=self._set_servo,
+            on_fps=self._set_fps,
         )
-        self._control_widget.pack(expand=True, fill="both")
+        self._control.pack(fill="both", expand=True)
 
-
-
+    # Status Bar
     def _build_statusbar(self):
-        """Creates the footer status bar with key telemetry values."""
-        bar = ttk.Frame(self, padding=(8, 4))
+        bar = ttk.Frame(self, padding=(10, 6))
         bar.pack(side=tk.BOTTOM, fill="x")
+
+        bar.grid_columnconfigure(0, weight=1)
+        bar.grid_columnconfigure(1, weight=1)
+        bar.grid_columnconfigure(2, weight=1)
+        bar.grid_columnconfigure(3, weight=1)
 
         self.var_laser = tk.StringVar(value="Laser: OFF")
         self.var_servo = tk.StringVar(value="Servo: Pan 0°, Tilt 0°")
         self.var_status = tk.StringVar(value="Status: Idle")
         self.var_fps = tk.StringVar(value="FPS: —")
 
-        for i in range(4):
-            bar.grid_columnconfigure(i, weight=1)
+        ttk.Label(bar, textvariable=self.var_laser).grid(row=0, column=0, sticky="w")
+        ttk.Label(bar, textvariable=self.var_servo).grid(row=0, column=1, sticky="w")
+        ttk.Label(bar, textvariable=self.var_status).grid(row=0, column=2, sticky="w")
+        ttk.Label(bar, textvariable=self.var_fps).grid(row=0, column=3, sticky="e")
 
-        ttk.Label(bar, textvariable=self.var_laser, anchor="w").grid(row=0, column=0, sticky="w")
-        ttk.Label(bar, textvariable=self.var_servo, anchor="center").grid(row=0, column=1)
-        ttk.Label(bar, textvariable=self.var_status, anchor="center").grid(row=0, column=2)
-        ttk.Label(bar, textvariable=self.var_fps, anchor="e").grid(row=0, column=3, sticky="e")
+    # Setters
+    def _set_laser(self, text): self.var_laser.set(text)
+    def _set_servo(self, text): self.var_servo.set(text)
+    def _set_status(self, text): self.var_status.set(text)
+    def _set_fps(self, text): self.var_fps.set(text)
+
+    # Actions
+    def _open_settings(self):
+        messagebox.showinfo("Settings", "Preferences go here.")
 
     def _show_about(self):
-        """Displays About dialog."""
-        messagebox.showinfo(
-            "About Visionary",
-            "Visionary – CS4398 Group 3\n\n"
-            "Wireframe-aligned Tkinter skeleton (dark theme).\n"
-            "This layout provides mount points for video and controls."
-        )
+        messagebox.showinfo("About", "Visionary")
 
     def on_exit(self):
-        """Safely close the application."""
         self.destroy()
 
 if __name__ == "__main__":
-    from ui.control_panel import ControlPanel
-
-    app = VisionaryApp()
-
-    panel = ControlPanel(app.control_frame)
-    panel.pack(expand=True, fill="both")
-
-    app.mainloop()
+    VisionaryApp().mainloop()
