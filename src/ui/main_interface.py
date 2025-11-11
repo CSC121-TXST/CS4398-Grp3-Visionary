@@ -44,7 +44,13 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_debug(self.debug_enabled)
 
         # Build UI 
-        build_menubar(self, on_exit=self.on_exit, on_about=self._show_about, on_toggle_debug=self._on_toggle_debug)
+        build_menubar(
+            self,
+            on_exit=self.on_exit,
+            on_about=self._show_about,
+            on_toggle_debug=self._on_toggle_debug,
+            on_change_detection_classes=self._on_change_detection_classes
+        )
         build_title(self)
 
         self._build_main_area()      # video + control panel
@@ -106,6 +112,17 @@ class VisionaryApp(tk.Tk):
         self.debug_enabled = enabled
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(enabled)
+
+    def _on_change_detection_classes(self, classes):
+        """Update tracker target classes from the Settings menu."""
+        if not hasattr(self, "tracker") or self.tracker is None:
+            return
+        # If empty list, treat as ALL classes
+        target = classes if classes else None
+        self.tracker.set_target_classes(target)
+        self.status.var_status.set(
+            f"Status: Classes = {', '.join(classes) if classes else 'ALL'}"
+        )
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""
