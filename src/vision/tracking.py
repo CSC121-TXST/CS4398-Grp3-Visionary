@@ -44,6 +44,9 @@ class ObjectTracker:
         device: str = "cpu",
         deepsort_ckpt: Optional[str] = None,
         target_classes: Optional[Iterable[str]] = None,
+        debug: bool = False,
+        process_interval: int = 2,
+        imgsz: int = 640,
     ):
         """
         Initialize the ObjectTracker with YOLOv8 and DeepSORT.
@@ -59,13 +62,17 @@ class ObjectTracker:
         self.conf = conf
         self.device = device
         self._set_target_classes(target_classes)
+        self.debug = debug
+        self.process_interval = max(1, int(process_interval))
+        self.imgsz = int(imgsz)
+        self._frame_counter = 0
+        self._last_output_frame = None
 
         # Load YOLO model for detection
         self.model = YOLO(model_path)
         try:
             self.model.to(device)
         except Exception:
-            # If device transfer fails, just stay on default
             pass
 
         # Initialize DeepSORT tracker
@@ -107,7 +114,12 @@ class ObjectTracker:
             enabled: True to enable tracking, False to disable
         """
         self.enabled = enabled
-        print(f"ObjectTracker enabled set to: {self.enabled}")
+        if self.debug:
+            print(f"ObjectTracker enabled set to: {self.enabled}")
+
+    def set_debug(self, enabled: bool):
+        """Enable/disable debug prints."""
+        self.debug = bool(enabled)
 
     def _set_target_classes(self, target_classes: Optional[Iterable[str]]):
         """Store the target classes (case-insensitive) or None for all classes."""
@@ -157,9 +169,15 @@ class ObjectTracker:
         if not self.enabled:
             return frame_bgr, []
 
+        # Frame skipping for performance
+        self._frame_counter += 1
+        should_process = (self._frame_counter % self.process_interval) == 0
+        if not should_process and self._last_output_frame is not None:
+            return self._last_output_frame, []
+
         # Run YOLO inference (convert to RGB explicitly)
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        results = self.model(frame_rgb, conf=self.conf, verbose=False)
+        results = self.model(frame_rgb, conf=self.conf, verbose=False, imgsz=self.imgsz)
         result = results[0]
 
         # Extract detections from YOLO results
@@ -171,7 +189,8 @@ class ObjectTracker:
         oids = []  # List of object class IDs (for DeepSORT's oid parameter)
         filtered_boxes = []  # Keep references to YOLO boxes that passed filtering
         
-        print(f"YOLO returned {len(result.boxes)} raw boxes")
+        if self.debug:
+            print(f"YOLO returned {len(result.boxes)} raw boxes")
         for box in result.boxes:
             # Get box coordinates in xyxy format
             x1, y1, x2, y2 = box.xyxy[0].tolist()
@@ -192,7 +211,8 @@ class ObjectTracker:
             oids.append(cls_id)
             filtered_boxes.append(box)
 
-        print(f"Filtered {len(bbox_xywh)} boxes for classes: {self.target_classes if self.target_classes else 'ALL'}")
+        if self.debug:
+            print(f"Filtered {len(bbox_xywh)} boxes for classes: {self.target_classes if self.target_classes else 'ALL'}")
         if len(bbox_xywh) > 0:
             bbox_xywh_np = np.array(bbox_xywh)
             confidences_np = np.array(confidences)
@@ -205,11 +225,18 @@ class ObjectTracker:
         else:
             # No detections, so no tracks
             tracked_outputs = []
-        print(f"DeepSORT outputs: {0 if tracked_outputs is None else len(tracked_outputs)} tracks")
+        if self.debug:
+            print(f"DeepSORT outputs: {0 if tracked_outputs is None else len(tracked_outputs)} tracks")
 
         # Draw results on output frame
         output_frame = frame_bgr.copy()
         tracked_objects = []
+
+        # Color map per class for visibility
+        class_colors = {
+            "person": (0, 255, 0),       # green
+            "cell phone": (255, 0, 0),   # blue-ish (BGR)
+        }
 
         # Draw tracked objects with persistent IDs
         # tracked_outputs can be a list or numpy array
@@ -233,7 +260,7 @@ class ObjectTracker:
                         break
                 
                 # Draw bounding box
-                color = (0, 255, 0)  # Green
+                color = class_colors.get(cls_name, (0, 255, 0))
                 cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, 2)
                 
                 # Draw label with track ID
@@ -265,16 +292,19 @@ class ObjectTracker:
                 cls_name = names.get(cls_id, str(cls_id))
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 label = f"{cls_name} {float(conf):.2f}"
-                cv2.rectangle(output_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                color = class_colors.get(cls_name, (0, 255, 0))
+                cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(
                     output_frame,
                     label,
                     (x1, y1 - 5),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
-                    (0, 255, 0),
+                    color,
                     1,
                     cv2.LINE_AA,
                 )
 
+        # Cache last output for skipped frames
+        self._last_output_frame = output_frame
         return output_frame, tracked_objects

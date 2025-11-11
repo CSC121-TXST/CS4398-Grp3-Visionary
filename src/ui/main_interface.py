@@ -29,16 +29,22 @@ class VisionaryApp(tk.Tk):
         # Apply dark theme before creating widgets
         apply_theme(self)
 
+        # Debug flag
+        self.debug_enabled = False
+
         # Initialize ObjectTracker before building UI
         # This creates the tracker once and reuses it throughout the app
         self.tracker = ObjectTracker(
             model_path="yolov8n.pt",
             conf=0.35,
-            target_classes=["person"]
+            target_classes=["person", "cell phone"]
         )
+        # Ensure tracker starts with debug disabled
+        if hasattr(self.tracker, "set_debug"):
+            self.tracker.set_debug(self.debug_enabled)
 
         # Build UI 
-        build_menubar(self, on_exit=self.on_exit, on_about=self._show_about)
+        build_menubar(self, on_exit=self.on_exit, on_about=self._show_about, on_toggle_debug=self._on_toggle_debug)
         build_title(self)
 
         self._build_main_area()      # video + control panel
@@ -94,6 +100,12 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_enabled(enabled)
             status_text = "Detection: ON" if enabled else "Detection: OFF"
             self.status.var_status.set(f"Status: {status_text}")
+
+    def _on_toggle_debug(self, enabled: bool):
+        """Toggle debug prints across the app."""
+        self.debug_enabled = enabled
+        if hasattr(self.tracker, "set_debug"):
+            self.tracker.set_debug(enabled)
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""
