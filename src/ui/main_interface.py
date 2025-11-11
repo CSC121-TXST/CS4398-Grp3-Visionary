@@ -14,6 +14,9 @@ from ui.interface_layout.video_panel import VideoPanel
 from ui.interface_layout.control_panel import ControlPanel
 from hardware.arduino_controller import ArduinoController
 
+# Tracking Module
+from vision.tracking import ObjectTracker
+
 
 class VisionaryApp(tk.Tk):
     """Main Tkinter window for the Visionary application."""
@@ -25,6 +28,14 @@ class VisionaryApp(tk.Tk):
 
         # Apply dark theme before creating widgets
         apply_theme(self)
+
+        # Initialize ObjectTracker before building UI
+        # This creates the tracker once and reuses it throughout the app
+        self.tracker = ObjectTracker(
+            model_path="yolov8n.pt",
+            conf=0.35,
+            target_classes=["person"]
+        )
 
         # Build UI 
         build_menubar(self, on_exit=self.on_exit, on_about=self._show_about)
@@ -41,9 +52,12 @@ class VisionaryApp(tk.Tk):
         main.grid_columnconfigure(1, weight=2)
         main.grid_rowconfigure(0, weight=1)
 
+        # Create VideoPanel with tracker
+        # Pass the tracker so it can process frames
         self.video_panel = VideoPanel(
             parent=main,
-            on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}")
+            on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
+            tracker=self.tracker  # Pass tracker to VideoPanel
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew",
                               padx=(10, 5), pady=(0, 10))
@@ -55,14 +69,31 @@ class VisionaryApp(tk.Tk):
         self.control_frame.grid(row=0, column=1, sticky="nsew",
                                 padx=(5, 10), pady=(0, 10))
 
+        # Create ControlPanel with tracking toggle callback
+        # Only pass on_toggle_tracking if tracker is available
         self._control_widget = ControlPanel(
             self.control_frame,
             camera=self.video_panel.camera,
             arduino=self.arduino,
             on_status=lambda s: self.status.var_status.set(f"Status: {s}"),
-            on_laser=lambda on: self.status.var_laser.set(f"Laser: {'ON' if on else 'OFF'}")
+            on_laser=lambda on: self.status.var_laser.set(f"Laser: {'ON' if on else 'OFF'}"),
+            on_toggle_tracking=self._on_toggle_tracking if self.tracker is not None else None
         )
         self._control_widget.pack(expand=True, fill="both")
+    
+    def _on_toggle_tracking(self, enabled: bool):
+        """
+        Callback when the tracking toggle is changed in the ControlPanel.
+        
+        This method enables or disables the ObjectTracker and updates the status bar.
+        
+        Args:
+            enabled: True to enable tracking, False to disable
+        """
+        if self.tracker is not None:
+            self.tracker.set_enabled(enabled)
+            status_text = "Detection: ON" if enabled else "Detection: OFF"
+            self.status.var_status.set(f"Status: {status_text}")
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""

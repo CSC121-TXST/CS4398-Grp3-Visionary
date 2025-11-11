@@ -72,10 +72,25 @@ class SimpleCamera:
         on_fps: Optional[Callable[[float], None]] = None,
         renderer: Optional[CanvasRenderer] = None,
         canvas=None,
+        frame_processor: Optional[Callable] = None,
     ):
+        """
+        Initialize SimpleCamera.
+        
+        Args:
+            index: Camera device index (default 0)
+            mirror: Whether to horizontally flip the frame
+            on_fps: Optional callback(float) for FPS updates
+            renderer: Optional CanvasRenderer instance
+            canvas: Optional Tkinter canvas (creates CanvasRenderer if renderer is None)
+            frame_processor: Optional callable(frame_bgr) -> processed_frame_bgr
+                           Called after mirroring, before rendering.
+                           Used for object detection/tracking processing.
+        """
         self.index = index
         self.mirror = mirror
         self.on_fps = on_fps
+        self.frame_processor = frame_processor
 
         # Camera state
         self._cap = None
@@ -150,8 +165,20 @@ class SimpleCamera:
         ok, frame_bgr = self._cap.read()
 
         if ok:
+            # Mirror the frame if requested
             if self.mirror:
                 frame_bgr = cv2.flip(frame_bgr, 1)
+            
+            # Apply frame processor (e.g., object detection/tracking)
+            # This allows external processing like drawing bounding boxes
+            if self.frame_processor is not None:
+                try:
+                    frame_bgr = self.frame_processor(frame_bgr)
+                except Exception as e:
+                    print(f"Frame processor error: {e}")
+                    raise
+            
+            # Render the (possibly processed) frame
             if self.renderer:
                 self.renderer.draw(frame_bgr)
 
