@@ -9,22 +9,27 @@ from ui.style import ACCENT, ACCENT_2
 
 from ui.interface_layout.control_buttons.camera_controls import CameraControls
 from ui.interface_layout.control_buttons.hardware_controls import HardwareControls
+from ui.interface_layout.vision_narration_panel import VisionNarrationPanel
 
 
 class ControlPanel(ttk.Frame):
     """Right-side UI composed from two small sub-widgets."""
-    def __init__(self, master=None, camera=None, arduino=None, on_status=None, on_laser=None):
+    def __init__(self, master=None, camera=None, arduino=None, on_status=None, on_laser=None, narrator=None, on_narrate_request=None):
         """
         camera:  object with start(), stop(), is_running()
         arduino: object with connect(), disconnect(), is_connected(), send_command(), blink()
         on_status: callback(str) to update status bar
         on_laser:  callback(bool) to update laser label
+        narrator: VisionNarrator instance (optional)
+        on_narrate_request: callback() to trigger narration (optional)
         """
         super().__init__(master, padding=10)
         self.camera = camera
         self.arduino = arduino
         self.on_status = on_status or (lambda s: None)
         self.on_laser = on_laser or (lambda on: None)
+        self.narrator = narrator
+        self.on_narrate_request = on_narrate_request
 
         self._build()
 
@@ -69,8 +74,14 @@ class ControlPanel(ttk.Frame):
 
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
 
-        # Placeholder for future stuff
-        ttk.Label(self, text="[Additional controls coming soon...]", foreground="#666").pack(anchor="w", pady=(10, 0))
+        # Vision Narration Panel
+        if self.narrator or self.on_narrate_request:
+            self.narration_panel = VisionNarrationPanel(
+                self,
+                narrator=self.narrator,
+                on_narrate_request=self.on_narrate_request
+            )
+            self.narration_panel.pack(fill="both", expand=True, pady=(0, 0))
 
     # share one StringVar for status inside the panel
     def _status_var(self):
