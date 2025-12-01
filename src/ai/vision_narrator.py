@@ -47,9 +47,10 @@ class VisionNarrator:
         else:
             try:
                 self.llm_client = LLMClient()
-            except (ImportError, ValueError):
+                print("DEBUG: Vision Narrator initialized with OpenAI API")
+            except (ImportError, ValueError) as e:
                 # Fallback to mock if API not available
-                print("Warning: LLM API not available, using mock client")
+                print(f"Warning: LLM API not available, using mock client. Error: {e}")
                 self.llm_client = MockLLMClient()
         
         self.auto_narrate_interval = auto_narrate_interval
@@ -255,6 +256,7 @@ class VisionNarrator:
         Generate a summary description from all detections collected during the period.
         
         This aggregates all detections and creates a comprehensive summary.
+        Uses unique track IDs to avoid counting the same object multiple times.
         """
         # Aggregate all detections from the period
         all_detections = []
@@ -264,11 +266,25 @@ class VisionNarrator:
         if not all_detections:
             return "No objects were detected during this period."
         
-        # Count objects by class across the entire period
+        # Count unique objects by class using track IDs
+        # Track IDs are persistent across frames, so we can deduplicate
+        seen_track_ids = set()
         class_counts = Counter()
+        
         for obj in all_detections:
+            track_id = obj.get("id")
             cls_name = obj.get("cls", "unknown")
-            class_counts[cls_name] += 1
+            
+            # Use track ID if available, otherwise fall back to counting all detections
+            if track_id is not None:
+                # Only count each unique track ID once per class
+                unique_key = (track_id, cls_name)
+                if unique_key not in seen_track_ids:
+                    seen_track_ids.add(unique_key)
+                    class_counts[cls_name] += 1
+            else:
+                # If no track ID, count all (fallback for detections without tracking)
+                class_counts[cls_name] += 1
         
         # Format summary with more detail for period
         parts = []

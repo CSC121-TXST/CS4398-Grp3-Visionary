@@ -64,13 +64,28 @@ class LLMClient:
         self.temperature = temperature
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         
+        # Debug: Print where we're looking for .env
+        if not self.api_key:
+            print(f"DEBUG: Looking for OPENAI_API_KEY in environment...")
+            print(f"DEBUG: Checked paths: {[str(p) for p in env_paths]}")
+            print(f"DEBUG: Current working directory: {os.getcwd()}")
+            print(f"DEBUG: OPENAI_API_KEY from env: {os.getenv('OPENAI_API_KEY')}")
+        
         # Initialize provider-specific client
         if self.provider == "openai":
             if not OPENAI_AVAILABLE:
                 raise ImportError("openai package required for OpenAI provider")
             if not self.api_key:
-                raise ValueError("OpenAI API key required. Set OPENAI_API_KEY environment variable.")
-            self.client = OpenAI(api_key=self.api_key)
+                raise ValueError(
+                    "OpenAI API key required. Set OPENAI_API_KEY environment variable.\n"
+                    f"Checked paths: {[str(p) for p in env_paths]}\n"
+                    f"Place .env file in src/ directory with: OPENAI_API_KEY=sk-..."
+                )
+            try:
+                self.client = OpenAI(api_key=self.api_key)
+                print("DEBUG: OpenAI client initialized successfully")
+            except Exception as e:
+                raise ValueError(f"Failed to initialize OpenAI client: {e}")
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     

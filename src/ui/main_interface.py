@@ -4,6 +4,7 @@ Main Interface module/window that assembles the pieces.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import threading
 
 from ui.style import apply_theme
 from ui.interface_layout.menubar import build_menubar
@@ -221,9 +222,17 @@ class VisionaryApp(tk.Tk):
         self.status.var_status.set("Status: Generating narration...")
         
         # Generate summary (this may take a moment)
-        try:
-            description = self.narrator.stop_recording_period()
-            
+        # Run in a separate thread to avoid blocking UI, then update UI in main thread
+        def run_in_thread():
+            try:
+                description = self.narrator.stop_recording_period()
+                # Schedule UI update in main thread
+                self.after(0, lambda: update_ui_with_description(description))
+            except Exception as e:
+                # Schedule error update in main thread
+                self.after(0, lambda: update_ui_with_error(str(e)))
+        
+        def update_ui_with_description(description):
             if description:
                 self.narration_panel.update_narration(description)
                 self.narration_panel.update_status("Complete")
@@ -236,19 +245,26 @@ class VisionaryApp(tk.Tk):
                 if hasattr(self, '_control_widget'):
                     self._control_widget.update_narration_status("No detections", "#9aa4b1")
                 self.status.var_status.set("Status: No detections in period")
+            
+            # Reset button states
+            if hasattr(self, '_control_widget'):
+                self._control_widget.reset_narration_buttons()
         
-        except Exception as e:
-            error_msg = f"Error generating narration: {str(e)}"
-            self.narration_panel.update_narration(error_msg)
+        def update_ui_with_error(error_msg):
+            self.narration_panel.update_narration(f"Error generating narration: {error_msg}")
             self.narration_panel.update_status("Error")
             if hasattr(self, '_control_widget'):
                 self._control_widget.update_narration_status("Error", "#F44336")
             self.status.var_status.set("Status: Narration error")
-            messagebox.showerror("Narration Error", error_msg)
+            messagebox.showerror("Narration Error", f"Error generating narration: {error_msg}")
+            
+            # Reset button states
+            if hasattr(self, '_control_widget'):
+                self._control_widget.reset_narration_buttons()
         
-        # Reset button states
-        if hasattr(self, '_control_widget'):
-            self._control_widget.reset_narration_buttons()
+        # Start generation in background thread
+        thread = threading.Thread(target=run_in_thread, daemon=True)
+        thread.start()
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""
