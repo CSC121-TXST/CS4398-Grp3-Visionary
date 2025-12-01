@@ -5,6 +5,7 @@ Control Panel Module
 
 import tkinter as tk
 from tkinter import ttk
+from typing import Callable, Optional
 from ui.style import ACCENT, ACCENT_2
 
 from ui.interface_layout.control_buttons.camera_controls import CameraControls
@@ -13,18 +14,31 @@ from ui.interface_layout.control_buttons.hardware_controls import HardwareContro
 
 class ControlPanel(ttk.Frame):
     """Right-side UI composed from two small sub-widgets."""
-    def __init__(self, master=None, camera=None, arduino=None, on_status=None, on_laser=None):
+    def __init__(
+        self, 
+        master=None, 
+        camera=None, 
+        arduino=None, 
+        on_status=None, 
+        on_laser=None,
+        on_toggle_tracking: Optional[Callable[[bool], None]] = None
+    ):
         """
-        camera:  object with start(), stop(), is_running()
-        arduino: object with connect(), disconnect(), is_connected(), send_command(), blink()
-        on_status: callback(str) to update status bar
-        on_laser:  callback(bool) to update laser label
+        Initialize ControlPanel.
+        
+        Args:
+            camera: object with start(), stop(), is_running()
+            arduino: object with connect(), disconnect(), is_connected(), send_command(), blink()
+            on_status: callback(str) to update status bar
+            on_laser: callback(bool) to update laser label
+            on_toggle_tracking: callback(bool) called when tracking toggle is changed
         """
         super().__init__(master, padding=10)
         self.camera = camera
         self.arduino = arduino
         self.on_status = on_status or (lambda s: None)
         self.on_laser = on_laser or (lambda on: None)
+        self.on_toggle_tracking = on_toggle_tracking
 
         self._build()
 
@@ -69,8 +83,38 @@ class ControlPanel(ttk.Frame):
 
         ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
 
+        # Object Detection Toggle
+        if self.on_toggle_tracking is not None:
+            ttk.Label(
+                self, text="Object Detection",
+                font=("Consolas", 12, "bold"), foreground=ACCENT_2
+            ).pack(anchor="w", pady=(0, 6))
+            
+            # BooleanVar to track checkbox state
+            self.tracking_var = tk.BooleanVar(value=False)  # Disabled by default
+            
+            # Checkbutton for enabling/disabling object tracking
+            tracking_check = ttk.Checkbutton(
+                self,
+                text="Enable Detection",
+                variable=self.tracking_var,
+                command=self._on_tracking_toggle
+            )
+            tracking_check.pack(anchor="w", pady=(0, 10))
+            
+            ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
+
         # Placeholder for future stuff
         ttk.Label(self, text="[Additional controls coming soon...]", foreground="#666").pack(anchor="w", pady=(10, 0))
+    
+    def _on_tracking_toggle(self):
+        """
+        Callback when the detection checkbox is toggled.
+        Calls the on_toggle_tracking callback with the new state.
+        """
+        if self.on_toggle_tracking is not None:
+            enabled = self.tracking_var.get()
+            self.on_toggle_tracking(enabled)
 
     # share one StringVar for status inside the panel
     def _status_var(self):
