@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from ui.style import style_menu
 
-def build_menubar(root, on_exit, on_about, on_toggle_debug=None, on_set_performance=None):
+def build_menubar(root, on_exit, on_about, on_toggle_debug=None, on_change_detection_classes=None):
     """Adds File/Settings/Help to the top of the window."""
     header = ttk.Frame(root, padding=(10, 6))
     header.pack(side=tk.TOP, fill="x")
@@ -32,28 +32,39 @@ def build_menubar(root, on_exit, on_about, on_toggle_debug=None, on_set_performa
             command=lambda: on_toggle_debug(root._var_debug.get())
         )
 
-    # Performance submenu (optional)
-    if on_set_performance is not None:
-        perf_menu = tk.Menu(settings_menu, tearoff=0)
-        style_menu(perf_menu)
-        if not hasattr(root, "_var_perf"):
-            root._var_perf = tk.StringVar(value="balanced")
-        perf_menu.add_radiobutton(
-            label="High FPS", value="high_fps",
-            variable=root._var_perf,
-            command=lambda: on_set_performance(root._var_perf.get())
+    # Detection Settings submenu (optional)
+    if on_change_detection_classes is not None:
+        det_menu = tk.Menu(settings_menu, tearoff=0)
+        style_menu(det_menu)
+        # Create vars on the root so they persist
+        if not hasattr(root, "_var_cls_person"):
+            root._var_cls_person = tk.BooleanVar(value=True)
+        if not hasattr(root, "_var_cls_cell_phone"):
+            root._var_cls_cell_phone = tk.BooleanVar(value=True)
+
+        def _emit_detection_classes():
+            classes = []
+            if root._var_cls_person.get():
+                classes.append("person")
+            if root._var_cls_cell_phone.get():
+                classes.append("cell phone")
+            on_change_detection_classes(classes)
+
+        det_menu.add_checkbutton(
+            label="Person",
+            onvalue=True,
+            offvalue=False,
+            variable=root._var_cls_person,
+            command=_emit_detection_classes
         )
-        perf_menu.add_radiobutton(
-            label="Balanced", value="balanced",
-            variable=root._var_perf,
-            command=lambda: on_set_performance(root._var_perf.get())
+        det_menu.add_checkbutton(
+            label="Cell Phone",
+            onvalue=True,
+            offvalue=False,
+            variable=root._var_cls_cell_phone,
+            command=_emit_detection_classes
         )
-        perf_menu.add_radiobutton(
-            label="High Accuracy", value="high_accuracy",
-            variable=root._var_perf,
-            command=lambda: on_set_performance(root._var_perf.get())
-        )
-        settings_menu.add_cascade(label="Performance", menu=perf_menu)
+        settings_menu.add_cascade(label="Detection Settings", menu=det_menu)
 
     help_menu = make_menu_button(header, "Help")
     help_menu.add_command(label="About", command=on_about)
