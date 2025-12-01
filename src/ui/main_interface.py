@@ -37,7 +37,7 @@ class VisionaryApp(tk.Tk):
         self.tracker = ObjectTracker(
             model_path="yolov8n.pt",
             conf=0.35,
-            target_classes=["person", "cell phone"]
+            target_classes=["person"]  # Default to person only, user can add more via settings
         )
         # Ensure tracker starts with debug disabled
         if hasattr(self.tracker, "set_debug"):
@@ -49,11 +49,8 @@ class VisionaryApp(tk.Tk):
             on_exit=self.on_exit,
             on_about=self._show_about,
             on_toggle_debug=self._on_toggle_debug,
-<<<<<<< HEAD
-            on_change_detection_classes=self._on_change_detection_classes
-=======
+            on_change_detection_classes=self._on_change_detection_classes,
             on_set_performance=self._on_set_performance
->>>>>>> Performance_Optimization
         )
         build_title(self)
 
@@ -73,7 +70,8 @@ class VisionaryApp(tk.Tk):
         self.video_panel = VideoPanel(
             parent=main,
             on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
-            tracker=self.tracker  # Pass tracker to VideoPanel
+            tracker=self.tracker,  # Pass tracker to VideoPanel
+            on_tracking_update=lambda count: self.status.var_tracking.set(f"Tracking: {count} objects")
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew",
                               padx=(10, 5), pady=(0, 10))
@@ -117,7 +115,6 @@ class VisionaryApp(tk.Tk):
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(enabled)
 
-<<<<<<< HEAD
     def _on_change_detection_classes(self, classes):
         """Update tracker target classes from the Settings menu."""
         if not hasattr(self, "tracker") or self.tracker is None:
@@ -128,13 +125,19 @@ class VisionaryApp(tk.Tk):
         self.status.var_status.set(
             f"Status: Classes = {', '.join(classes) if classes else 'ALL'}"
         )
-=======
+
     def _on_set_performance(self, mode: str):
         """Apply a performance profile to the tracker at runtime."""
         if not hasattr(self, "tracker") or self.tracker is None:
             return
         mode = (mode or "").strip().lower()
-        if mode == "high_fps":
+        if mode == "ultra_fast":
+            # Maximum FPS: heavy skipping, very small input, lower conf
+            self.tracker.set_process_interval(6)
+            self.tracker.set_imgsz(416)
+            self.tracker.set_conf(0.30)
+            self.status.var_status.set("Status: Performance = Ultra Fast")
+        elif mode == "high_fps":
             # Emphasize FPS: more skipping, smaller input, moderate conf
             self.tracker.set_process_interval(4)
             self.tracker.set_imgsz(480)
@@ -146,13 +149,18 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_imgsz(640)
             self.tracker.set_conf(0.50)
             self.status.var_status.set("Status: Performance = High Accuracy")
+        elif mode == "max_quality":
+            # Maximum quality: process every frame, larger input, highest conf
+            self.tracker.set_process_interval(1)
+            self.tracker.set_imgsz(832)
+            self.tracker.set_conf(0.60)
+            self.status.var_status.set("Status: Performance = Maximum Quality")
         else:
             # Balanced default
             self.tracker.set_process_interval(2)
             self.tracker.set_imgsz(640)
             self.tracker.set_conf(0.35)
             self.status.var_status.set("Status: Performance = Balanced")
->>>>>>> Performance_Optimization
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""

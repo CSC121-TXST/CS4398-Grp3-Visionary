@@ -67,6 +67,7 @@ class ObjectTracker:
         self.imgsz = int(imgsz)
         self._frame_counter = 0
         self._last_output_frame = None
+        self._last_tracked_count = 0
 
         # Load YOLO model for detection
         self.model = YOLO(model_path)
@@ -244,10 +245,14 @@ class ObjectTracker:
         output_frame = frame_bgr.copy()
         tracked_objects = []
 
-        # Color map per class for visibility
+        # Color map per class for visibility (BGR format)
         class_colors = {
-            "person": (0, 255, 0),       # green
-            "cell phone": (255, 0, 0),   # blue-ish (BGR)
+            "person": (0, 255, 0),           # green
+            "cell phone": (255, 0, 0),        # blue
+            "dog": (0, 165, 255),            # orange
+            "cat": (255, 20, 147),            # deep pink
+            "book": (255, 255, 0),            # cyan
+            "backpack": (128, 0, 128),        # purple
         }
 
         # Draw tracked objects with persistent IDs
@@ -272,18 +277,32 @@ class ObjectTracker:
                         break
                 
                 # Draw bounding box
-                color = class_colors.get(cls_name, (0, 255, 0))
-                cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, 2)
+                color = class_colors.get(cls_name.lower(), (0, 255, 255))  # Default to cyan for unknown classes
+                thickness = 2
+                cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, thickness)
                 
-                # Draw label with track ID
+                # Draw label with track ID (improved formatting)
                 label = f"ID:{track_id} {cls_name} {conf:.2f}"
+                # Calculate text size for background
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+                )
+                # Draw background rectangle for better text visibility
+                cv2.rectangle(
+                    output_frame,
+                    (x1, y1 - text_height - 5),
+                    (x1 + text_width, y1),
+                    color,
+                    -1
+                )
+                # Draw text in white for contrast
                 cv2.putText(
                     output_frame,
                     label,
                     (x1, y1 - 5),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
-                    color,
+                    (255, 255, 255),  # White text
                     1,
                     cv2.LINE_AA,
                 )
@@ -304,19 +323,56 @@ class ObjectTracker:
                 cls_name = names.get(cls_id, str(cls_id))
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 label = f"{cls_name} {float(conf):.2f}"
-                color = class_colors.get(cls_name, (0, 255, 0))
-                cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, 2)
+                color = class_colors.get(cls_name.lower(), (0, 255, 255))  # Default to cyan
+                thickness = 2
+                cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, thickness)
+                # Draw background for text
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+                )
+                cv2.rectangle(
+                    output_frame,
+                    (x1, y1 - text_height - 5),
+                    (x1 + text_width, y1),
+                    color,
+                    -1
+                )
                 cv2.putText(
                     output_frame,
                     label,
                     (x1, y1 - 5),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
-                    color,
+                    (255, 255, 255),  # White text
                     1,
                     cv2.LINE_AA,
                 )
 
         # Cache last output for skipped frames
         self._last_output_frame = output_frame
+        self._last_tracked_count = len(tracked_objects)
         return output_frame, tracked_objects
+    
+    def get_tracking_stats(self) -> Dict:
+        """
+        Get current tracking statistics.
+        
+        Returns:
+            Dictionary with tracking statistics:
+            {
+                "tracked_count": int,      # Number of currently tracked objects
+                "enabled": bool,            # Whether tracking is enabled
+                "process_interval": int,    # Frame processing interval
+                "imgsz": int,               # Image size for inference
+                "conf": float,              # Confidence threshold
+                "target_classes": list or None  # Target classes or None for all
+            }
+        """
+        return {
+            "tracked_count": self._last_tracked_count,
+            "enabled": self.enabled,
+            "process_interval": self.process_interval,
+            "imgsz": self.imgsz,
+            "conf": self.conf,
+            "target_classes": list(self.target_classes) if self.target_classes else None
+        }
