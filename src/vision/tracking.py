@@ -121,6 +121,18 @@ class ObjectTracker:
         """Enable/disable debug prints."""
         self.debug = bool(enabled)
 
+    def set_process_interval(self, interval: int):
+        self.process_interval = max(1, int(interval))
+
+    def set_imgsz(self, imgsz: int):
+        self.imgsz = int(imgsz)
+
+    def set_conf(self, conf: float):
+        try:
+            self.conf = float(conf)
+        except Exception:
+            pass
+
     def _set_target_classes(self, target_classes: Optional[Iterable[str]]):
         """Store the target classes (case-insensitive) or None for all classes."""
         if target_classes:

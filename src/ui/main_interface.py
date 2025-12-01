@@ -44,7 +44,13 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_debug(self.debug_enabled)
 
         # Build UI 
-        build_menubar(self, on_exit=self.on_exit, on_about=self._show_about, on_toggle_debug=self._on_toggle_debug)
+        build_menubar(
+            self,
+            on_exit=self.on_exit,
+            on_about=self._show_about,
+            on_toggle_debug=self._on_toggle_debug,
+            on_set_performance=self._on_set_performance
+        )
         build_title(self)
 
         self._build_main_area()      # video + control panel
@@ -106,6 +112,30 @@ class VisionaryApp(tk.Tk):
         self.debug_enabled = enabled
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(enabled)
+
+    def _on_set_performance(self, mode: str):
+        """Apply a performance profile to the tracker at runtime."""
+        if not hasattr(self, "tracker") or self.tracker is None:
+            return
+        mode = (mode or "").strip().lower()
+        if mode == "high_fps":
+            # Emphasize FPS: more skipping, smaller input, moderate conf
+            self.tracker.set_process_interval(4)
+            self.tracker.set_imgsz(480)
+            self.tracker.set_conf(0.35)
+            self.status.var_status.set("Status: Performance = High FPS")
+        elif mode == "high_accuracy":
+            # Emphasize accuracy: no skipping, normal input size, higher conf
+            self.tracker.set_process_interval(1)
+            self.tracker.set_imgsz(640)
+            self.tracker.set_conf(0.50)
+            self.status.var_status.set("Status: Performance = High Accuracy")
+        else:
+            # Balanced default
+            self.tracker.set_process_interval(2)
+            self.tracker.set_imgsz(640)
+            self.tracker.set_conf(0.35)
+            self.status.var_status.set("Status: Performance = Balanced")
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""
