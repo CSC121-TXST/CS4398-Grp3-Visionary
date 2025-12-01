@@ -12,10 +12,14 @@ from ui.interface_layout.status_bar import StatusBar
 from ui.interface_layout.video_panel import VideoPanel
 
 from ui.interface_layout.control_panel import ControlPanel
+from ui.interface_layout.narration_panel import NarrationPanel
 from hardware.arduino_controller import ArduinoController
 
 # Tracking Module
 from vision.tracking import ObjectTracker
+
+# AI Module
+from ai import VisionNarrator
 
 
 class VisionaryApp(tk.Tk):
@@ -42,6 +46,15 @@ class VisionaryApp(tk.Tk):
         # Ensure tracker starts with debug disabled
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(self.debug_enabled)
+
+        # Initialize Vision Narrator
+        try:
+            self.narrator = VisionNarrator(use_mock=False)
+            self.narrator_available = True
+        except Exception as e:
+            print(f"Warning: Vision Narrator not available: {e}")
+            self.narrator = None
+            self.narrator_available = False
 
         # Build UI 
         build_menubar(
@@ -71,7 +84,8 @@ class VisionaryApp(tk.Tk):
             parent=main,
             on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
             tracker=self.tracker,  # Pass tracker to VideoPanel
-            on_tracking_update=lambda count: self.status.var_tracking.set(f"Tracking: {count} objects")
+            on_tracking_update=lambda count: self.status.var_tracking.set(f"Tracking: {count} objects"),
+            on_narration_detection=self._on_narration_detection if self.narrator_available else None
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew",
                               padx=(10, 5), pady=(0, 10))
@@ -91,9 +105,17 @@ class VisionaryApp(tk.Tk):
             arduino=self.arduino,
             on_status=lambda s: self.status.var_status.set(f"Status: {s}"),
             on_laser=lambda on: self.status.var_laser.set(f"Laser: {'ON' if on else 'OFF'}"),
-            on_toggle_tracking=self._on_toggle_tracking if self.tracker is not None else None
+            on_toggle_tracking=self._on_toggle_tracking if self.tracker is not None else None,
+            on_start_narration=self._on_start_narration_period if self.narrator_available else None,
+            on_end_narration=self._on_end_narration_period if self.narrator_available else None
         )
         self._control_widget.pack(expand=True, fill="both")
+        
+        # Create Narration Panel below control panel
+        if self.narrator_available:
+            self.narration_panel = NarrationPanel(main)
+            self.narration_panel.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
+            main.grid_rowconfigure(1, weight=1)
     
     def _on_toggle_tracking(self, enabled: bool):
         """
@@ -161,6 +183,72 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_imgsz(640)
             self.tracker.set_conf(0.35)
             self.status.var_status.set("Status: Performance = Balanced")
+
+    def _on_narration_detection(self, tracked_objects):
+        """
+        Callback when detections are available during narration period.
+        
+        Args:
+            tracked_objects: List of detected objects from ObjectTracker
+        """
+        if self.narrator and self.narrator.is_recording_period_active():
+            self.narrator.add_detection_to_period(tracked_objects)
+    
+    def _on_start_narration_period(self):
+        """Start a narration recording period."""
+        if not self.narrator or not hasattr(self, 'narration_panel'):
+            messagebox.showwarning("Narration Unavailable", "Vision Narrator is not available.")
+            return
+        
+        self.narrator.start_recording_period()
+        self.narration_panel.update_status("Recording...")
+        self.narration_panel.update_narration("Started narration period. Detections are being collected...")
+        self.status.var_status.set("Status: Narration period active")
+    
+    def _on_end_narration_period(self):
+        """End the narration period and generate summary."""
+        if not self.narrator or not hasattr(self, 'narration_panel'):
+            return
+        
+        if not self.narrator.is_recording_period_active():
+            messagebox.showinfo("No Active Period", "No narration period is currently active.")
+            return
+        
+        # Update UI to show processing
+        self.narration_panel.update_status("Processing...")
+        if hasattr(self, '_control_widget'):
+            self._control_widget.update_narration_status("Processing...", "#FF9800")
+        self.status.var_status.set("Status: Generating narration...")
+        
+        # Generate summary (this may take a moment)
+        try:
+            description = self.narrator.stop_recording_period()
+            
+            if description:
+                self.narration_panel.update_narration(description)
+                self.narration_panel.update_status("Complete")
+                if hasattr(self, '_control_widget'):
+                    self._control_widget.update_narration_status("Complete", "#4CAF50")
+                self.status.var_status.set("Status: Narration complete")
+            else:
+                self.narration_panel.update_narration("No objects were detected during this period.")
+                self.narration_panel.update_status("No detections")
+                if hasattr(self, '_control_widget'):
+                    self._control_widget.update_narration_status("No detections", "#9aa4b1")
+                self.status.var_status.set("Status: No detections in period")
+        
+        except Exception as e:
+            error_msg = f"Error generating narration: {str(e)}"
+            self.narration_panel.update_narration(error_msg)
+            self.narration_panel.update_status("Error")
+            if hasattr(self, '_control_widget'):
+                self._control_widget.update_narration_status("Error", "#F44336")
+            self.status.var_status.set("Status: Narration error")
+            messagebox.showerror("Narration Error", error_msg)
+        
+        # Reset button states
+        if hasattr(self, '_control_widget'):
+            self._control_widget.reset_narration_buttons()
 
     def _build_statusbar(self):
         """Creates the footer status bar with key telemetry values."""

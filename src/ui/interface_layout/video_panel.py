@@ -12,7 +12,7 @@ class VideoPanel(ttk.LabelFrame):
     This panel can optionally use an ObjectTracker to process frames
     for object detection and tracking before displaying them.
     """
-    def __init__(self, parent, on_fps, tracker=None, on_tracking_update=None):
+    def __init__(self, parent, on_fps, tracker=None, on_tracking_update=None, on_narration_detection=None):
         """
         Initialize VideoPanel.
         
@@ -21,10 +21,12 @@ class VideoPanel(ttk.LabelFrame):
             on_fps: Callback(float) for FPS updates
             tracker: Optional ObjectTracker instance for object detection/tracking
             on_tracking_update: Optional callback(int) for tracking count updates
+            on_narration_detection: Optional callback(List[Dict]) for narration period detections
         """
         super().__init__(parent, text="Video Feed")
         self.tracker = tracker
         self.on_tracking_update = on_tracking_update
+        self.on_narration_detection = on_narration_detection
         
         # Canvas with grid/crosshair
         self.canvas = add_video_grid(self)
@@ -60,6 +62,9 @@ class VideoPanel(ttk.LabelFrame):
             # Update tracking statistics if callback is provided
             if self.on_tracking_update is not None:
                 self.on_tracking_update(len(tracked_objects))
+            # Pass detections to narration system if callback provided
+            if self.on_narration_detection is not None:
+                self.on_narration_detection(tracked_objects)
             return processed_frame
         elif self.on_tracking_update is not None:
             # No tracker, so no objects being tracked

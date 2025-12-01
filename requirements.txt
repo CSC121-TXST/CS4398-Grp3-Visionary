@@ -9,10 +9,14 @@ Pillow>=10.0.0
 # Hardware communication (future)
 pyserial>=3.5
 
-# Machine Learning / LLM (planned)
+# Machine Learning / LLM
 tensorflow>=2.13.0
 torch>=2.0.0
 transformers>=4.30.0
+
+# LLM Integration (Sprint 4)
+openai>=1.0.0
+python-dotenv>=1.0.0
 
 # GUI Framework (Tkinter included with Python)
 # (No install required for most systems right now)
