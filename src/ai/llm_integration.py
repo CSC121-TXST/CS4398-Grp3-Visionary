@@ -17,13 +17,19 @@ env_paths = [
     Path(__file__).parent.parent / ".env",  # src/.env
     Path(__file__).parent.parent.parent / ".env",  # root/.env
 ]
+
+env_loaded = False
 for env_path in env_paths:
     if env_path.exists():
-        load_dotenv(env_path)
+        print(f"DEBUG: Loading .env from: {env_path}")
+        load_dotenv(env_path, override=True)  # override=True ensures we use the file
+        env_loaded = True
         break
-else:
+
+if not env_loaded:
+    print("DEBUG: No .env file found in expected paths, trying default location...")
     # Fallback to default behavior (searches from current working directory)
-    load_dotenv()
+    load_dotenv(override=True)
 
 try:
     from openai import OpenAI
@@ -66,10 +72,17 @@ class LLMClient:
         
         # Debug: Print where we're looking for .env
         if not self.api_key:
+            print(f"ERROR: OPENAI_API_KEY not found!")
             print(f"DEBUG: Looking for OPENAI_API_KEY in environment...")
             print(f"DEBUG: Checked paths: {[str(p) for p in env_paths]}")
             print(f"DEBUG: Current working directory: {os.getcwd()}")
             print(f"DEBUG: OPENAI_API_KEY from env: {os.getenv('OPENAI_API_KEY')}")
+            print(f"DEBUG: Checking if .env files exist:")
+            for env_path in env_paths:
+                exists = env_path.exists()
+                print(f"  {env_path}: {'EXISTS' if exists else 'NOT FOUND'}")
+                if exists:
+                    print(f"    File size: {env_path.stat().st_size} bytes")
         
         # Initialize provider-specific client
         if self.provider == "openai":
@@ -129,6 +142,9 @@ class LLMClient:
         user_prompt = f"Detections: {detection_summary}\n\nProvide a natural description of what is visible."
         
         try:
+            print(f"DEBUG: Making OpenAI API call with model: {self.model}")
+            print(f"DEBUG: Prompt length: {len(user_prompt)} chars")
+            
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -139,9 +155,18 @@ class LLMClient:
                 temperature=self.temperature,
             )
             
-            return response.choices[0].message.content.strip()
+            # Log API usage
+            usage = response.usage
+            print(f"DEBUG: API call successful!")
+            print(f"DEBUG: Tokens used - Input: {usage.prompt_tokens}, Output: {usage.completion_tokens}, Total: {usage.total_tokens}")
+            
+            result = response.choices[0].message.content.strip()
+            print(f"DEBUG: Response received: {len(result)} chars")
+            
+            return result
             
         except Exception as e:
+            print(f"DEBUG: API call failed: {e}")
             raise Exception(f"OpenAI API error: {str(e)}")
     
     def is_available(self) -> bool:
@@ -154,19 +179,5 @@ class LLMClient:
             return False
 
 
-class MockLLMClient:
-    """
-    Mock LLM client for testing without API calls.
-    Returns simple formatted descriptions.
-    """
-    
-    def __init__(self, *args, **kwargs):
-        pass
-    
-    def generate_description(self, detection_summary: str, system_prompt: Optional[str] = None) -> str:
-        """Generate a simple mock description."""
-        return f"I see {detection_summary.lower()} in the frame."
-    
-    def is_available(self) -> bool:
-        return True
+# MockLLMClient removed - system now requires real OpenAI API
 

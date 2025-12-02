@@ -48,12 +48,14 @@ class VisionaryApp(tk.Tk):
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(self.debug_enabled)
 
-        # Initialize Vision Narrator
+        # Initialize Vision Narrator (requires OpenAI API key)
         try:
-            self.narrator = VisionNarrator(use_mock=False)
+            self.narrator = VisionNarrator()
             self.narrator_available = True
+            print("DEBUG: Vision Narrator initialized successfully")
         except Exception as e:
-            print(f"Warning: Vision Narrator not available: {e}")
+            print(f"ERROR: Vision Narrator initialization failed: {e}")
+            print(f"ERROR: Please ensure OPENAI_API_KEY is set in src/.env file")
             self.narrator = None
             self.narrator_available = False
 

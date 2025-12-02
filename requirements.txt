@@ -18,6 +18,9 @@ transformers>=4.30.0
 openai>=1.0.0
 python-dotenv>=1.0.0
 
+# Text-to-Speech for accessibility
+pyttsx3>=2.90
+
 # GUI Framework (Tkinter included with Python)
 # (No install required for most systems right now)
 

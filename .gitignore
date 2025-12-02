@@ -27,3 +27,6 @@ Thumbs.db
 # Logs and temp
 *.log
 *.tmp
+
+# Event logs
+events.json

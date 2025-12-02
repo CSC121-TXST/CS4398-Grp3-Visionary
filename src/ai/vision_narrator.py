@@ -13,7 +13,9 @@ from collections import Counter, defaultdict
 import time
 from datetime import datetime
 
-from .llm_integration import LLMClient, MockLLMClient
+from .llm_integration import LLMClient
+from .event_logger import EventLogger
+from .tts_engine import TTSEngine
 
 
 class VisionNarrator:
@@ -29,29 +31,26 @@ class VisionNarrator:
         llm_client: Optional[LLMClient] = None,
         auto_narrate_interval: int = 60,
         enable_auto_narrate: bool = True,
-        use_mock: bool = False,
     ):
         """
         Initialize Vision Narrator.
         
         Args:
-            llm_client: LLMClient instance (if None, creates default)
+            llm_client: LLMClient instance (if None, creates default OpenAI client)
             auto_narrate_interval: Seconds between auto-narrations
             enable_auto_narrate: Whether to auto-narrate periodically
-            use_mock: Use mock client instead of real API (for testing)
+        
+        Raises:
+            ValueError: If OpenAI API key is not configured in .env file
+            ImportError: If openai package is not installed
         """
-        if use_mock:
-            self.llm_client = MockLLMClient()
-        elif llm_client:
+        if llm_client:
             self.llm_client = llm_client
         else:
-            try:
-                self.llm_client = LLMClient()
-                print("DEBUG: Vision Narrator initialized with OpenAI API")
-            except (ImportError, ValueError) as e:
-                # Fallback to mock if API not available
-                print(f"Warning: LLM API not available, using mock client. Error: {e}")
-                self.llm_client = MockLLMClient()
+            # Initialize real OpenAI client - will raise exception if API key not found
+            print("DEBUG: Initializing OpenAI client...")
+            self.llm_client = LLMClient()
+            print("DEBUG: Vision Narrator initialized with OpenAI API")
         
         self.auto_narrate_interval = auto_narrate_interval
         self.enable_auto_narrate = enable_auto_narrate
@@ -64,6 +63,12 @@ class VisionNarrator:
         self._period_start_time: Optional[float] = None
         self._period_detections: List[Dict] = []  # Store all detections during period
         self._period_detection_timestamps: List[float] = []  # Track when each detection occurred
+        
+        # Event logging
+        self.event_logger = EventLogger()
+        
+        # Text-to-speech for accessibility
+        self.tts = TTSEngine()
     
     def format_detections(self, tracked_objects: List[Dict]) -> str:
         """
@@ -304,24 +309,66 @@ class VisionNarrator:
         else:
             duration_str = "the recording period"
         
-        # Create enhanced prompt for period summary
+        # Create enhanced prompt for period summary (event-style with suggestions)
         period_prompt = (
             f"During {duration_str}, the following objects were detected: {detection_summary}. "
-            f"Provide a natural, spoken-style summary describing what was seen during this time period."
+            f"Analyze this detection data and provide: "
+            f"1. A clear description of what was observed "
+            f"2. Suggestions about what activity or event might have been occurring "
+            f"3. Context about the scene (e.g., 'people moving', 'objects being used', 'activity patterns')"
         )
         
         try:
-            # Use a more detailed system prompt for period summaries
+            # Use an event-focused system prompt that provides interpretive suggestions
             system_prompt = (
-                "You are an accessibility assistant. Create a natural, conversational summary "
-                "of what was observed during a time period. Use first person (e.g., 'I saw...'). "
-                "Be descriptive and helpful. Mention the variety of objects if multiple types were detected."
+                "You are an accessibility assistant analyzing security camera-style event logs. "
+                "For each detection period, provide: "
+                "1. A clear, natural description of what was detected (use first person: 'I observed...') "
+                "2. Interpretive suggestions about what activity or event was likely occurring "
+                "3. Context about movement patterns, object usage, or scene dynamics "
+                "Format as a brief event log entry that helps someone understand what happened. "
+                "Be descriptive but concise. Focus on actionable insights about the activity."
             )
             description = self.llm_client.generate_description(period_prompt, system_prompt)
             self._last_description = description
+            
+            # Log as event
+            if self._period_start_time and self._period_detection_timestamps:
+                duration = self._period_detection_timestamps[-1] - self._period_start_time
+            else:
+                duration = time.time() - self._period_start_time if self._period_start_time else 0
+            
+            unique_objects = len(class_counts)
+            self.event_logger.log_event(
+                description=description,
+                duration_seconds=duration,
+                detection_summary=detection_summary,
+                unique_objects=unique_objects,
+                detection_count=len(self._period_detections)
+            )
+            
+            # Speak the description for accessibility
+            if self.tts.is_available():
+                self.tts.speak(description, async_mode=True)
+            
             return description
         except Exception as e:
             print(f"Error generating period summary: {e}")
             # Fallback description
-            return f"During the recording period, I saw {detection_summary.lower()}."
+            fallback = f"During the recording period, I saw {detection_summary.lower()}."
+            
+            # Still log the event even with fallback
+            try:
+                duration = self._period_detection_timestamps[-1] - self._period_start_time if self._period_start_time and self._period_detection_timestamps else 0
+                self.event_logger.log_event(
+                    description=fallback,
+                    duration_seconds=duration,
+                    detection_summary=detection_summary,
+                    unique_objects=len(class_counts),
+                    detection_count=len(self._period_detections)
+                )
+            except Exception:
+                pass  # Don't fail if logging fails
+            
+            return fallback
 
