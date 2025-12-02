@@ -27,3 +27,5 @@ pyttsx3>=2.90
 # Testing & Dev Tools
 pytest>=7.4.0
 pytest-cov>=4.1.0
+pytest-html>=3.2.0
+pytest-xdist>=3.3.0  # For parallel test execution
