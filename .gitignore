@@ -9,6 +9,7 @@ __pycache__/
 # Virtual environments
 venv/
 .env/
+.env
 
 # Build and distribution
 build/
@@ -26,3 +27,13 @@ Thumbs.db
 # Logs and temp
 *.log
 *.tmp
+
+# Event logs
+events.json
+
+# Test reports and coverage
+tests/reports/
+tests/.coverage
+.coverage
+htmlcov/
+.pytest_cache/

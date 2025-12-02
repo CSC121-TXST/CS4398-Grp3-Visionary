@@ -196,6 +196,12 @@ class ObjectTracker:
         # Extract detections from YOLO results
         names = result.names  # Maps class id -> class name
         
+        if self.debug:
+            # Print all available class names for debugging
+            if not hasattr(self, "_printed_classes"):
+                print(f"DEBUG: Available YOLO classes: {list(names.values())}")
+                self._printed_classes = True
+        
         # Prepare data for DeepSORT
         bbox_xywh = []  # List of (cx, cy, w, h) boxes
         confidences = []  # List of confidence scores
@@ -214,8 +220,23 @@ class ObjectTracker:
             cls_name = names.get(cls_id, str(cls_id))
 
             # Filter detections to requested classes (e.g., person only)
-            if self.target_classes and cls_name.lower() not in self.target_classes:
+            # Normalize class name for matching (handle variations)
+            cls_name_normalized = cls_name.lower().strip()
+            
+            # Check if this class should be tracked
+            if self.target_classes and cls_name_normalized not in self.target_classes:
+                if self.debug:
+                    print(f"DEBUG: Filtered out {cls_name} (normalized: '{cls_name_normalized}', target_classes: {self.target_classes})")
                 continue
+            
+            # Additional check: ensure confidence meets threshold (YOLO already filters, but double-check)
+            if conf < self.conf:
+                if self.debug:
+                    print(f"DEBUG: Filtered out {cls_name} due to low confidence: {conf:.2f} < {self.conf}")
+                continue
+            
+            if self.debug:
+                print(f"DEBUG: Keeping detection: {cls_name} (conf: {conf:.2f}, normalized: '{cls_name_normalized}')")
 
             # Convert to xywh (center format) for DeepSORT
             cx, cy, w, h = self._xyxy_to_xywh(x1, y1, x2, y2)
