@@ -114,10 +114,11 @@ class ServoTracker:
         norm_y = (target_y - img_h / 2.0) / img_h
         
         # Convert normalized coordinates to angle offsets
-        # Positive norm_x means object is to the right, so pan right (increase angle)
-        # Positive norm_y means object is below center, so tilt down (increase angle)
-        pan_offset = norm_x * self.fov_horizontal
-        tilt_offset = norm_y * self.fov_vertical
+        # Invert signs to correct for reversed servo directions
+        # Positive norm_x means object is to the right, so pan left (decrease angle)
+        # Positive norm_y means object is below center, so tilt up (decrease angle)
+        pan_offset = -norm_x * self.fov_horizontal  # Inverted: right = decrease angle
+        tilt_offset = -norm_y * self.fov_vertical   # Inverted: down = decrease angle
         
         # Calculate target angles
         pan_angle = self.pan_center + pan_offset
@@ -160,9 +161,9 @@ class ServoTracker:
         norm_x = (center_x - img_w / 2.0) / img_w
         norm_y = (target_y - img_h / 2.0) / img_h
         
-        # Convert to angle offsets
-        pan_offset = norm_x * self.fov_horizontal
-        tilt_offset = norm_y * self.fov_vertical
+        # Convert to angle offsets (inverted to correct for reversed servo directions)
+        pan_offset = -norm_x * self.fov_horizontal  # Inverted: right = decrease angle
+        tilt_offset = -norm_y * self.fov_vertical   # Inverted: down = decrease angle
         
         # Calculate target angles
         pan_angle = self.pan_center + pan_offset
