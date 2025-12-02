@@ -57,3 +57,16 @@ class ArduinoController:
                 self.arduino.close()
             finally:
                 self.arduino = None
+
+# src/hardware/arduino_controller.py  (add near the bottom)
+
+    # --- Servo helpers (optional, just sugar over send_command) ---
+    def servo_start(self):
+        self.send_command("START")
+
+    def servo_stop(self):
+        self.send_command("STOP")
+
+    def servo_set_angle(self, angle: int):
+        angle = max(0, min(180, int(angle)))
+        self.send_command(f"ANGLE:{angle}")

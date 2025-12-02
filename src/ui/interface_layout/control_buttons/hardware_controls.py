@@ -22,6 +22,10 @@ class HardwareControls(ttk.Frame):
         self.on_laser = on_laser
         self.status_text = status_text
 
+        self._connected_controls = None
+        self._servo_running = False
+        self._angle_after_id = None  # for slider debounce
+
         # Connect button (appears initially; replaced after connect)
         self.connect_btn = ttk.Button(
             self, text="Connect Hardware",
@@ -186,3 +190,93 @@ class HardwareControls(ttk.Frame):
             self._connected_controls, text="Disconnect",
             style="Accent.TButton", command=self._disconnect_hardware
         ).pack(fill="x", pady=4)
+
+        servo_frame = ttk.LabelFrame(self._connected_controls, text="Servo")
+        servo_frame.pack(fill="x", pady=(8, 8))
+
+        self._servo_btn = ttk.Button(
+            servo_frame, text="Start Servo",
+            style="Accent.TButton", command=self._toggle_servo
+        )
+        self._servo_btn.pack(fill="x", pady=(8, 6))
+
+        # Angle row (only sends when STOPPED)
+        angle_row = ttk.Frame(servo_frame)
+        angle_row.pack(fill="x", pady=(2, 10))
+        ttk.Label(angle_row, text="Angle").pack(side="left")
+
+        self._angle_var = tk.IntVar(value=90)
+        self._angle_slider = ttk.Scale(
+            angle_row, from_=0, to=180, orient="horizontal",
+            command=self._on_angle_drag
+        )
+        self._angle_slider.set(90)
+        self._angle_slider.pack(side="left", fill="x", expand=True, padx=8)
+
+        self._angle_lbl = ttk.Label(angle_row, text="90°")
+        self._angle_lbl.pack(side="left")
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=8)
+
+        ttk.Button(
+            self._connected_controls, text="Disconnect",
+            style="Accent.TButton", command=self._disconnect_hardware
+        ).pack(fill="x", pady=4)
+
+    # ---- Servo actions ----
+    def _toggle_servo(self):
+        if not self.arduino or not self.arduino.is_connected():
+            messagebox.showwarning("Visionary", "Arduino not connected.")
+            return
+        try:
+            if not self._servo_running:
+                # START sweeping / attach on Arduino
+                if hasattr(self.arduino, "servo_start"):
+                    self.arduino.servo_start()
+                else:
+                    self.arduino.send_command("START")
+                self._servo_running = True
+                self._servo_btn.configure(text="Stop Servo")
+                self.status_text.set("Servo: START")
+                self.on_status("Servo: START")
+            else:
+                # STOP (detach) on Arduino
+                if hasattr(self.arduino, "servo_stop"):
+                    self.arduino.servo_stop()
+                else:
+                    self.arduino.send_command("STOP")
+                self._servo_running = False
+                self._servo_btn.configure(text="Start Servo")
+                self.status_text.set("Servo: STOP")
+                self.on_status("Servo: STOP")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Servo toggle failed:\n{e}")
+
+    def _on_angle_drag(self, val_str):
+        # Update label live
+        angle = int(float(val_str))
+        self._angle_lbl.config(text=f"{angle}°")
+
+        # Only send when NOT running (avoid fighting the sweep)
+        if self._servo_running or not self.arduino or not self.arduino.is_connected():
+            return
+
+        # Debounce to avoid spamming the serial line
+        if self._angle_after_id:
+            try: self.after_cancel(self._angle_after_id)
+            except Exception: pass
+
+        self._angle_after_id = self.after(120, self._send_angle)
+
+    def _send_angle(self):
+        self._angle_after_id = None
+        angle = int(self._angle_var.get() if isinstance(self._angle_var.get(), int) else float(self._angle_var.get()))
+        try:
+            if hasattr(self.arduino, "servo_set_angle"):
+                self.arduino.servo_set_angle(angle)
+            else:
+                self.arduino.send_command(f"ANGLE:{angle}")
+            self.status_text.set(f"Servo angle → {angle}°")
+            self.on_status(f"Servo angle → {angle}°")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Set angle failed:\n{e}")
