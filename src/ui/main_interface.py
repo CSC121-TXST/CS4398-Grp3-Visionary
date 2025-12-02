@@ -41,8 +41,8 @@ class VisionaryApp(tk.Tk):
         # This creates the tracker once and reuses it throughout the app
         self.tracker = ObjectTracker(
             model_path="yolov8n.pt",
-            conf=0.35,
-            target_classes=["person"]  # Default to person only, user can add more via settings
+            conf=0.20,  # Lower confidence (0.20) for better detection of small objects like phones/books
+            target_classes=["person", "cell phone", "book"]  # Default includes common objects
         )
         # Ensure tracker starts with debug disabled
         if hasattr(self.tracker, "set_debug"):
@@ -72,6 +72,10 @@ class VisionaryApp(tk.Tk):
 
         self._build_main_area()      # video + control panel
         self._build_statusbar()      # footer
+        
+        # Sync UI checkboxes with initial tracker classes after UI is built
+        # This ensures the menu reflects the actual tracker state (person, cell phone, book)
+        self.after(100, self._sync_detection_classes_ui)
 
     def _build_main_area(self):
         """Constructs the main layout with video and control panels."""
@@ -140,6 +144,28 @@ class VisionaryApp(tk.Tk):
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(enabled)
 
+    def _sync_detection_classes_ui(self):
+        """Sync UI checkboxes with tracker's current target classes."""
+        if not hasattr(self, "tracker") or self.tracker is None:
+            return
+        
+        # Get current tracker classes
+        tracker_classes = self.tracker.target_classes if hasattr(self.tracker, 'target_classes') and self.tracker.target_classes else set()
+        
+        # Update checkboxes to match tracker state
+        if hasattr(self, "_var_cls_person"):
+            self._var_cls_person.set("person" in tracker_classes)
+        if hasattr(self, "_var_cls_cell_phone"):
+            self._var_cls_cell_phone.set("cell phone" in tracker_classes)
+        if hasattr(self, "_var_cls_book"):
+            self._var_cls_book.set("book" in tracker_classes)
+        if hasattr(self, "_var_cls_dog"):
+            self._var_cls_dog.set("dog" in tracker_classes)
+        if hasattr(self, "_var_cls_cat"):
+            self._var_cls_cat.set("cat" in tracker_classes)
+        if hasattr(self, "_var_cls_backpack"):
+            self._var_cls_backpack.set("backpack" in tracker_classes)
+    
     def _on_change_detection_classes(self, classes):
         """Update tracker target classes from the Settings menu."""
         if not hasattr(self, "tracker") or self.tracker is None:
@@ -147,9 +173,19 @@ class VisionaryApp(tk.Tk):
         # If empty list, treat as ALL classes
         target = classes if classes else None
         self.tracker.set_target_classes(target)
-        self.status.var_status.set(
-            f"Status: Classes = {', '.join(classes) if classes else 'ALL'}"
-        )
+        
+        # Update status with current classes
+        if target:
+            self.status.var_status.set(
+                f"Status: Classes = {', '.join(classes)}"
+            )
+        else:
+            self.status.var_status.set("Status: Classes = ALL")
+        
+        # Debug output
+        if self.debug_enabled:
+            print(f"DEBUG: Updated target classes to: {target}")
+            print(f"DEBUG: Tracker target_classes set: {self.tracker.target_classes}")
 
     def _on_set_performance(self, mode: str):
         """Apply a performance profile to the tracker at runtime."""

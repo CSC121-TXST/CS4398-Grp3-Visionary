@@ -37,16 +37,17 @@ def build_menubar(root, on_exit, on_about, on_toggle_debug=None, on_change_detec
         det_menu = tk.Menu(settings_menu, tearoff=0)
         style_menu(det_menu)
         # Create vars on the root so they persist
+        # Default: person, cell phone, and book enabled for better tracking
         if not hasattr(root, "_var_cls_person"):
             root._var_cls_person = tk.BooleanVar(value=True)
         if not hasattr(root, "_var_cls_cell_phone"):
-            root._var_cls_cell_phone = tk.BooleanVar(value=False)
+            root._var_cls_cell_phone = tk.BooleanVar(value=True)  # Enabled by default
         if not hasattr(root, "_var_cls_dog"):
             root._var_cls_dog = tk.BooleanVar(value=False)
         if not hasattr(root, "_var_cls_cat"):
             root._var_cls_cat = tk.BooleanVar(value=False)
         if not hasattr(root, "_var_cls_book"):
-            root._var_cls_book = tk.BooleanVar(value=False)
+            root._var_cls_book = tk.BooleanVar(value=True)  # Enabled by default
         if not hasattr(root, "_var_cls_backpack"):
             root._var_cls_backpack = tk.BooleanVar(value=False)
 
