@@ -19,6 +19,9 @@ from hardware.arduino_controller import ArduinoController
 # Tracking Module
 from vision.tracking import ObjectTracker
 
+# Servo Tracking Module
+from hardware.servo_tracking import ServoTracker
+
 # AI Module
 from ai import VisionNarrator
 
@@ -92,13 +95,25 @@ class VisionaryApp(tk.Tk):
             on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
             tracker=self.tracker,  # Pass tracker to VideoPanel
             on_tracking_update=lambda count: self.status.var_tracking.set(f"Tracking: {count} objects"),
-            on_narration_detection=self._on_narration_detection if self.narrator_available else None
+            on_narration_detection=self._on_narration_detection if self.narrator_available else None,
+            on_servo_tracking=self._on_servo_tracking  # Callback for servo tracking
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew",
                               padx=(10, 5), pady=(0, 10))
 
         # Hardware
         self.arduino = ArduinoController()
+        
+        # Initialize ServoTracker for automatic target tracking
+        # Default image size will be updated from actual camera frames
+        self.servo_tracker = ServoTracker(
+            image_width=640,
+            image_height=480,
+            pan_range=(30, 150),
+            tilt_range=(40, 140),
+            offset_vertical=0.15  # Aim 15% below center mass for safety
+        )
+        self._auto_tracking_active = True  # Enabled by default when auto-tracking mode is on
 
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
         self.control_frame.grid(row=0, column=1, sticky="nsew",
@@ -114,7 +129,8 @@ class VisionaryApp(tk.Tk):
             on_laser=lambda on: self.status.var_laser.set(f"Laser: {'ON' if on else 'OFF'}"),
             on_toggle_tracking=self._on_toggle_tracking if self.tracker is not None else None,
             on_start_narration=self._on_start_narration_period if self.narrator_available else None,
-            on_end_narration=self._on_end_narration_period if self.narrator_available else None
+            on_end_narration=self._on_end_narration_period if self.narrator_available else None,
+            on_auto_tracking_toggle=self._on_auto_tracking_toggle
         )
         self._control_widget.pack(expand=True, fill="both")
         
@@ -137,6 +153,77 @@ class VisionaryApp(tk.Tk):
             self.tracker.set_enabled(enabled)
             status_text = "Detection: ON" if enabled else "Detection: OFF"
             self.status.var_status.set(f"Status: {status_text}")
+
+    def _on_auto_tracking_toggle(self, enabled: bool):
+        """
+        Callback when auto-tracking toggle is changed in HardwareControls.
+        
+        This enables/disables automatic servo tracking of detected objects.
+        
+        Args:
+            enabled: True to enable servo auto-tracking, False to disable
+        """
+        self._auto_tracking_active = enabled
+        if self.debug_enabled:
+            print(f"Servo auto-tracking: {'enabled' if enabled else 'disabled'}")
+
+    def _on_servo_tracking(self, tracked_objects, frame_shape):
+        """
+        Callback when objects are detected and need to be tracked with servos.
+        
+        This method converts detected object coordinates to servo angles and sends
+        commands to the Arduino for automatic tracking.
+        
+        Args:
+            tracked_objects: List of detected objects with bbox coordinates
+            frame_shape: (width, height) tuple of frame dimensions
+        """
+        # Only track if Arduino is connected and auto-tracking is enabled
+        if not self.arduino or not self.arduino.is_connected():
+            return
+        
+        if not self._auto_tracking_active:
+            return
+        
+        if not tracked_objects or len(tracked_objects) == 0:
+            return
+        
+        try:
+            # Update servo tracker with actual frame dimensions
+            width, height = frame_shape
+            self.servo_tracker.update_image_size(width, height)
+            
+            # Track the first (or largest) detected object
+            # Priority: person > other objects, or largest bounding box
+            target = None
+            max_area = 0
+            
+            for obj in tracked_objects:
+                x1, y1, x2, y2 = obj["bbox"]
+                area = (x2 - x1) * (y2 - y1)
+                # Prefer person detections
+                if obj.get("cls", "").lower() == "person":
+                    target = obj
+                    break
+                elif area > max_area:
+                    max_area = area
+                    target = obj
+            
+            if target:
+                # Convert bounding box to servo angles
+                pan_angle, tilt_angle = self.servo_tracker.bbox_to_angles(
+                    target["bbox"],
+                    image_width=width,
+                    image_height=height
+                )
+                
+                # Send auto-tracking command to Arduino
+                self.arduino.servo_auto_track(pan_angle, tilt_angle)
+                
+        except Exception as e:
+            # Silently fail to avoid spamming errors during tracking
+            if self.debug_enabled:
+                print(f"Servo tracking error: {e}")
 
     def _on_toggle_debug(self, enabled: bool):
         """Toggle debug prints across the app."""
