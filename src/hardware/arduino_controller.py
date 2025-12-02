@@ -4,9 +4,9 @@ import serial
 import serial.tools.list_ports
 
 class ArduinoController:
-    def __init__(self, baudrate=9600, timeout=2, port=None):
+    def __init__(self, baudrate=115200, timeout=2, port=None):
         """
-        baudrate: must match Serial.begin(...) in Arduino sketch (9600)
+        baudrate: must match Serial.begin(...) in Arduino sketch (115200)
         timeout: read timeout in seconds
         port: optional explicit COM port (e.g., "COM3"); if None we auto-discover
         """
@@ -58,15 +58,72 @@ class ArduinoController:
             finally:
                 self.arduino = None
 
-# src/hardware/arduino_controller.py  (add near the bottom)
+    # --- Laser control (independent of servo tracking) ---
+    def laser_on(self):
+        """Turn laser on (Pin 13, via transistor)."""
+        self.send_command("L,1")
 
-    # --- Servo helpers (optional, just sugar over send_command) ---
+    def laser_off(self):
+        """Turn laser off."""
+        self.send_command("L,0")
+
+    def laser_toggle(self, state: bool):
+        """Toggle laser on or off based on state."""
+        if state:
+            self.laser_on()
+        else:
+            self.laser_off()
+
+    # --- Servo control methods for CompleteSketch ---
+    def servo_auto_track(self, pan: int, tilt: int):
+        """
+        Set servo angles in auto-tracking mode (only works if auto mode enabled).
+        Offsets are applied automatically on Arduino side to aim lower than center mass.
+        
+        Args:
+            pan: Pan angle (0-180, left-right, Pin 10)
+            tilt: Tilt angle (0-180, up-down, Pin 9)
+        """
+        pan = max(0, min(180, int(pan)))
+        tilt = max(0, min(180, int(tilt)))
+        self.send_command(f"A,{pan},{tilt}")
+
+    def servo_manual_control(self, pan: int, tilt: int):
+        """
+        Manual override: set servo angles using auto-tracking command.
+        Note: This requires auto mode to be enabled. If disabled, enable it first.
+        
+        Args:
+            pan: Pan angle (0-180, left-right, Pin 10)
+            tilt: Tilt angle (0-180, up-down, Pin 9)
+        """
+        pan = max(0, min(180, int(pan)))
+        tilt = max(0, min(180, int(tilt)))
+        # Use A,pan,tilt command - it works when auto mode is enabled
+        self.send_command(f"A,{pan},{tilt}")
+
+    def set_auto_tracking_mode(self, enabled: bool):
+        """
+        Enable or disable auto-tracking mode.
+        When disabled, auto-tracking commands (A,pan,tilt) are ignored.
+        
+        Args:
+            enabled: True to enable auto-tracking, False to disable
+        """
+        # CompleteSketch uses M,0/1 for mode toggle (not AUTO,)
+        self.send_command(f"M,{1 if enabled else 0}")
+
+    # --- Legacy servo helpers for backwards compatibility ---
     def servo_start(self):
-        self.send_command("START")
+        """Legacy: not used by CompleteSketch, but kept for compatibility."""
+        pass
 
     def servo_stop(self):
-        self.send_command("STOP")
+        """Legacy: not used by CompleteSketch, but kept for compatibility."""
+        pass
 
     def servo_set_angle(self, angle: int):
+        """Legacy: sets both servos to same angle (for backwards compatibility)."""
         angle = max(0, min(180, int(angle)))
-        self.send_command(f"ANGLE:{angle}")
+        # Use manual control as fallback
+        self.servo_manual_control(angle, angle)
