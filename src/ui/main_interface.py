@@ -78,34 +78,36 @@ class VisionaryApp(tk.Tk):
         self.after(100, self._sync_detection_classes_ui)
 
     def _build_main_area(self):
-        """Constructs the main layout with video and control panels."""
+        # Main Layout
         main = ttk.Frame(self)
-        main.pack(side=tk.TOP, fill="both", expand=True)
+        main.pack(side=tk.TOP, fill="both", expand=True, padx=15, pady=15)
+        
+        # Grid Configuration
         main.grid_columnconfigure(0, weight=3)
         main.grid_columnconfigure(1, weight=2)
         main.grid_rowconfigure(0, weight=1)
 
-        # Create VideoPanel with tracker
-        # Pass the tracker so it can process frames
+        # Video Panel
         self.video_panel = VideoPanel(
             parent=main,
             on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
-            tracker=self.tracker,  # Pass tracker to VideoPanel
+            tracker=self.tracker,
             on_tracking_update=lambda count: self.status.var_tracking.set(f"Tracking: {count} objects"),
             on_narration_detection=self._on_narration_detection if self.narrator_available else None
         )
-        self.video_panel.grid(row=0, column=0, sticky="nsew",
-                              padx=(10, 5), pady=(0, 10))
+        self.video_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 15), pady=0)
 
         # Hardware
         self.arduino = ArduinoController()
 
-        self.control_frame = ttk.LabelFrame(main, text="Control Panel")
-        self.control_frame.grid(row=0, column=1, sticky="nsew",
-                                padx=(5, 10), pady=(0, 10))
+        # Sidebar Container
+        sidebar = ttk.Frame(main)
+        sidebar.grid(row=0, column=1, sticky="nsew")
 
-        # Create ControlPanel with tracking toggle callback
-        # Only pass on_toggle_tracking if tracker is available
+        # Control Panel
+        self.control_frame = ttk.LabelFrame(sidebar, text="Control Panel", padding=10)
+        self.control_frame.pack(side=tk.TOP, fill="x", expand=False, pady=(0, 15))
+
         self._control_widget = ControlPanel(
             self.control_frame,
             camera=self.video_panel.camera,
@@ -118,11 +120,10 @@ class VisionaryApp(tk.Tk):
         )
         self._control_widget.pack(expand=True, fill="both")
         
-        # Create Narration Panel below control panel
+        # Narration Panel
         if self.narrator_available:
-            self.narration_panel = NarrationPanel(main)
-            self.narration_panel.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
-            main.grid_rowconfigure(1, weight=1)
+            self.narration_panel = NarrationPanel(sidebar)
+            self.narration_panel.pack(side=tk.TOP, fill="both", expand=True)
     
     def _on_toggle_tracking(self, enabled: bool):
         """
