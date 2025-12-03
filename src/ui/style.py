@@ -2,93 +2,62 @@
 
 import tkinter as tk
 from tkinter import ttk
+from ttkthemes import ThemedStyle
 
-# ---- Palette
-SEC_BG   = "#0f1115"   # app background
-SEC_SURF = "#161a20"   # panels
-SEC_LINE = "#232a33"   # borders
-ACCENT   = "#00c2c7"   # primary accent
-ACCENT_2 = "#15ffa8"   # active accent
-TEXT     = "#e6edf3"   # main text
-MUTED    = "#9aa4b1"   # secondary text
+# Palette
+SEC_BG   = "#464646"
+SEC_SURF = "#2b2b2b"
+SEC_LINE = "#3a3a3a"
+ACCENT   = "#00c2c7"
+ACCENT_2 = "#15ffa8"
+TEXT     = "#e6edf3"
+MUTED    = "#9aa4b1"
 
 def font(primary=True, size=10, weight="normal"):
-    family = "Consolas" if primary else "Segoe UI"
+    family = "Segoe UI" if primary else "Calibri" 
     return (family, size, weight)
 
 def apply_theme(root: tk.Tk):
-    """Apply dark security-console theme to ttk + window."""
-    style = ttk.Style(root)
+    style = ThemedStyle(root)
     try:
-        style.theme_use("clam")
+        style.set_theme("equilux")
     except Exception:
-        pass
+        style.theme_use("clam")
 
-    # Global defaults
-    style.configure(".",
-        background=SEC_BG,
-        foreground=TEXT,
-        fieldbackground=SEC_SURF,
-        highlightthickness=0
-    )
-    # Containers
-    style.configure("TFrame", background=SEC_BG)
-    style.configure("TLabelframe", background=SEC_BG, bordercolor=SEC_LINE)
-    style.configure("TLabelframe.Label", background=SEC_BG, foreground=MUTED,
-                    font=font(False, 10, "bold"))
-    # Text
-    style.configure("TLabel", background=SEC_BG, foreground=TEXT)
-    # Buttons (accented)
-    style.configure("Accent.TButton",
-        background=SEC_SURF, foreground=TEXT, bordercolor=ACCENT,
-        focusthickness=0, padding=8)
-    style.map("Accent.TButton",
-        background=[("active", "#1b212a")],
-        bordercolor=[("active", ACCENT_2)])
+    # Global Defaults
+    style.configure(".", font=font(True, 10))
+    
+    # Buttons
+    style.configure("TButton", padding=6, font=font(True, 10, "bold"))
 
-    # Inputs
-    style.configure("TCombobox", fieldbackground=SEC_SURF,
-                    background=SEC_SURF, foreground=TEXT)
-    style.configure("TScale", background=SEC_BG, troughcolor=SEC_SURF)
+    # Labelframes
+    style.configure("TLabelframe", font=font(True, 10, "bold"))
+    style.configure("TLabelframe.Label", font=font(True, 10, "bold"))
 
-    # Menubuttons (top header menu bar)
-    style.configure("TMenubutton",
-        background=SEC_SURF,
-        foreground=TEXT,
-        padding=(10, 4),
-        borderwidth=0
-    )
-    style.map("TMenubutton",
-        background=[
-            ("active", "#0f141a"),
-            ("pressed", "#0d1116")
-        ],
-        foreground=[
-            ("active", "#00e5ff"),   # bright cyan-blue text
-            ("pressed", "#00c2c7")
-        ]
-    )
+    # Header Fonts
+    style.configure("Header.TLabel", font=("Segoe UI", 14, "bold"))
+    
+    # Status Bar Style
+    style.configure("Status.TLabel", font=("Consolas", 9), background=style.lookup("TFrame", "background"))
 
-    # Window bg
-    root.configure(bg=SEC_BG)
+    # Window Background
+    bg_color = style.lookup("TFrame", "background")
+    root.configure(bg=bg_color)
 
 def style_menu(menu: tk.Menu):
-    """Apply dark style to a tk.Menu instance."""
+    # Menu Style
     menu.configure(
         tearoff=0,
-        bg=SEC_SURF, fg=TEXT,
-        activebackground="#1b212a", activeforeground=TEXT,
+        bg="#464646", fg="#e6edf3",
+        activebackground="#5e5e5e", activeforeground="#ffffff",
         bd=0, relief="flat"
     )
 
 def add_video_grid(parent: ttk.LabelFrame):
-    """
-    This creates a canvas with a subtle grid + crosshair for the video area.
-    Returns the canvas; We'll later just get rid of this once the Camera function works.
-    """
-    canvas = tk.Canvas(parent, bg=SEC_SURF, highlightthickness=0, bd=0)
+    # Grid Canvas
+    canvas = tk.Canvas(parent, bg="#2b2b2b", highlightthickness=0, bd=0)
     canvas.pack(fill="both", expand=True)
-    line_color = "#1f2630"
+    line_color = "#3a3a3a"
 
     def redraw_grid(_evt=None):
         canvas.delete("grid")
