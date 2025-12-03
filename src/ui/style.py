@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from ttkthemes import ThemedStyle
 
-# Palette
+# Palette Constants
 SEC_BG   = "#464646"
 SEC_SURF = "#2b2b2b"
 SEC_LINE = "#3a3a3a"
@@ -13,28 +13,51 @@ ACCENT_2 = "#15ffa8"
 TEXT     = "#e6edf3"
 MUTED    = "#9aa4b1"
 
+# Theme State
+_is_dark_mode = True
+
 def font(primary=True, size=10, weight="normal"):
+    # Font Selection
     family = "Segoe UI" if primary else "Calibri" 
     return (family, size, weight)
 
 def apply_theme(root: tk.Tk):
+    # Initial Theme Setup
     style = ThemedStyle(root)
     try:
         style.set_theme("equilux")
     except Exception:
         style.theme_use("clam")
+    
+    _configure_custom_styles(style, root)
 
+def toggle_theme(root: tk.Tk):
+    # Theme Toggle Logic
+    global _is_dark_mode
+    style = ThemedStyle(root)
+    
+    if _is_dark_mode:
+        style.set_theme("arc") 
+        _is_dark_mode = False
+    else:
+        style.set_theme("equilux") 
+        _is_dark_mode = True
+        
+    _configure_custom_styles(style, root)
+    return _is_dark_mode
+
+def _configure_custom_styles(style, root):
     # Global Defaults
     style.configure(".", font=font(True, 10))
     
-    # Buttons
+    # Button Style
     style.configure("TButton", padding=6, font=font(True, 10, "bold"))
 
-    # Labelframes
+    # Labelframe Style
     style.configure("TLabelframe", font=font(True, 10, "bold"))
     style.configure("TLabelframe.Label", font=font(True, 10, "bold"))
 
-    # Header Fonts
+    # Header Style
     style.configure("Header.TLabel", font=("Segoe UI", 14, "bold"))
     
     # Status Bar Style
@@ -45,7 +68,7 @@ def apply_theme(root: tk.Tk):
     root.configure(bg=bg_color)
 
 def style_menu(menu: tk.Menu):
-    # Menu Style
+    # Menu Styling
     menu.configure(
         tearoff=0,
         bg="#464646", fg="#e6edf3",
@@ -54,12 +77,13 @@ def style_menu(menu: tk.Menu):
     )
 
 def add_video_grid(parent: ttk.LabelFrame):
-    # Grid Canvas
+    # Grid Canvas Setup
     canvas = tk.Canvas(parent, bg="#2b2b2b", highlightthickness=0, bd=0)
     canvas.pack(fill="both", expand=True)
     line_color = "#3a3a3a"
 
     def redraw_grid(_evt=None):
+        # Grid Drawing Logic
         canvas.delete("grid")
         w, h = canvas.winfo_width(), canvas.winfo_height()
         step = 40

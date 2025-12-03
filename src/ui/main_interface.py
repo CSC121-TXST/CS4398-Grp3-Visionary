@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 
-from ui.style import apply_theme
+from ui.style import apply_theme, toggle_theme
 from ui.interface_layout.menubar import build_menubar
 from ui.interface_layout.title_bar import build_title
 from ui.interface_layout.status_bar import StatusBar
@@ -22,6 +22,36 @@ from vision.tracking import ObjectTracker
 # AI Module
 from ai import VisionNarrator
 
+class ToggleSwitch(tk.Canvas):
+    # Custom Toggle Widget
+    def __init__(self, parent, command=None, *args, **kwargs):
+        super().__init__(parent, width=50, height=24, highlightthickness=0, bd=0, *args, **kwargs)
+        self.command = command
+        self.is_on = True
+        self.bind("<Button-1>", self._toggle)
+        self._draw()
+
+    def _toggle(self, event=None):
+        # Click Handler
+        self.is_on = not self.is_on
+        self._draw()
+        if self.command:
+            self.command()
+
+    def _draw(self):
+        # Drawing Logic
+        self.delete("all")
+        bg = "#00c2c7" if self.is_on else "#777777"
+        fg = "#ffffff"
+        
+        # Pill Shape
+        self.create_oval(2, 2, 22, 22, fill=bg, outline=bg)
+        self.create_oval(28, 2, 48, 22, fill=bg, outline=bg)
+        self.create_rectangle(12, 2, 38, 22, fill=bg, outline=bg)
+        
+        # Circle Indicator
+        cx = 38 if self.is_on else 12
+        self.create_oval(cx-8, 4, cx+8, 20, fill=fg, outline=fg)
 
 class VisionaryApp(tk.Tk):
     """Main Tkinter window for the Visionary application."""
@@ -78,7 +108,7 @@ class VisionaryApp(tk.Tk):
         self.after(100, self._sync_detection_classes_ui)
 
     def _build_main_area(self):
-        # Main Layout
+        # Main Layout Container
         main = ttk.Frame(self)
         main.pack(side=tk.TOP, fill="both", expand=True, padx=15, pady=15)
         
@@ -97,12 +127,30 @@ class VisionaryApp(tk.Tk):
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 15), pady=0)
 
-        # Hardware
+        # Hardware Controller
         self.arduino = ArduinoController()
 
         # Sidebar Container
         sidebar = ttk.Frame(main)
         sidebar.grid(row=0, column=1, sticky="nsew")
+
+        # Theme Header
+        theme_frame = ttk.Frame(sidebar)
+        theme_frame.pack(side=tk.TOP, fill="x", pady=(0, 10))
+        
+        lbl_mode = ttk.Label(theme_frame, text="Dark Mode", font=("Segoe UI", 10, "bold"))
+        lbl_mode.pack(side=tk.RIGHT, padx=(10, 0))
+        
+        # Theme Toggle Logic
+        def on_toggle():
+            is_dark = toggle_theme(self)
+            lbl_mode.config(text="Dark Mode" if is_dark else "Light Mode")
+            
+            new_bg = self.cget("bg")
+            self.theme_switch.config(bg=new_bg)
+            
+        self.theme_switch = ToggleSwitch(theme_frame, command=on_toggle, bg=self.cget('bg'))
+        self.theme_switch.pack(side=tk.RIGHT)
 
         # Control Panel
         self.control_frame = ttk.LabelFrame(sidebar, text="Control Panel", padding=10)
