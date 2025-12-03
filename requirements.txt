@@ -21,8 +21,8 @@ python-dotenv>=1.0.0
 # Text-to-Speech for accessibility
 pyttsx3>=2.90
 
-# GUI Framework (Tkinter included with Python)
-# (No install required for most systems right now)
+# GUI Framework
+ttkthemes>=3.2.0
 
 # Testing & Dev Tools
 pytest>=7.4.0
