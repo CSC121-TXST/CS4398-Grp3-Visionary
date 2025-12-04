@@ -21,6 +21,7 @@ from vision.tracking import ObjectTracker
 
 # Servo Tracking Module
 from hardware.servo_tracking import ServoTracker
+from hardware.target_selector import TargetSelector
 
 # AI Module
 from ai import VisionNarrator
@@ -113,6 +114,17 @@ class VisionaryApp(tk.Tk):
             tilt_range=(40, 140),
             offset_vertical=0.15  # Aim 15% below center mass for safety
         )
+        
+        # Initialize TargetSelector for intelligent target selection
+        self.target_selector = TargetSelector(
+            persistence_frames=10,  # Keep tracking target for 10 frames after it's lost
+            priority_threshold=20.0,  # Need 20+ priority difference to switch targets
+            center_weight=0.3,  # 30% weight for center proximity
+            size_weight=0.4,  # 40% weight for size
+            confidence_weight=0.2,  # 20% weight for confidence
+            class_weight=0.1,  # 10% weight for class priority
+        )
+        
         self._auto_tracking_active = True  # Enabled by default when auto-tracking mode is on
 
         self.control_frame = ttk.LabelFrame(main, text="Control Panel")
@@ -164,6 +176,10 @@ class VisionaryApp(tk.Tk):
             enabled: True to enable servo auto-tracking, False to disable
         """
         self._auto_tracking_active = enabled
+        if enabled:
+            # Reset target selector when re-enabling to start fresh
+            if hasattr(self, 'target_selector'):
+                self.target_selector.reset()
         if self.debug_enabled:
             print(f"Servo auto-tracking: {'enabled' if enabled else 'disabled'}")
 
@@ -171,8 +187,8 @@ class VisionaryApp(tk.Tk):
         """
         Callback when objects are detected and need to be tracked with servos.
         
-        This method converts detected object coordinates to servo angles and sends
-        commands to the Arduino for automatic tracking.
+        This method uses TargetSelector to intelligently choose the best target
+        and converts its coordinates to servo angles for automatic tracking.
         
         Args:
             tracked_objects: List of detected objects with bbox coordinates
@@ -185,29 +201,18 @@ class VisionaryApp(tk.Tk):
         if not self._auto_tracking_active:
             return
         
-        if not tracked_objects or len(tracked_objects) == 0:
-            return
-        
         try:
             # Update servo tracker with actual frame dimensions
             width, height = frame_shape
             self.servo_tracker.update_image_size(width, height)
             
-            # Track the first (or largest) detected object
-            # Priority: person > other objects, or largest bounding box
-            target = None
-            max_area = 0
-            
-            for obj in tracked_objects:
-                x1, y1, x2, y2 = obj["bbox"]
-                area = (x2 - x1) * (y2 - y1)
-                # Prefer person detections
-                if obj.get("cls", "").lower() == "person":
-                    target = obj
-                    break
-                elif area > max_area:
-                    max_area = area
-                    target = obj
+            # Use TargetSelector to choose the best target
+            # This handles priority scoring, persistence, and prevents bouncing
+            target = self.target_selector.select_target(
+                tracked_objects if tracked_objects else [],
+                width,
+                height
+            )
             
             if target:
                 # Convert bounding box to servo angles
@@ -219,6 +224,17 @@ class VisionaryApp(tk.Tk):
                 
                 # Send auto-tracking command to Arduino
                 self.arduino.servo_auto_track(pan_angle, tilt_angle)
+                
+                # Debug output
+                if self.debug_enabled:
+                    target_id = target.get("id", "?")
+                    target_cls = target.get("cls", "?")
+                    print(f"Tracking target ID:{target_id} ({target_cls}) -> Pan:{pan_angle}°, Tilt:{tilt_angle}°")
+            else:
+                # No target selected (target lost but within persistence window)
+                # Servos will hold last position
+                if self.debug_enabled:
+                    print("No target selected (holding last position)")
                 
         except Exception as e:
             # Silently fail to avoid spamming errors during tracking
