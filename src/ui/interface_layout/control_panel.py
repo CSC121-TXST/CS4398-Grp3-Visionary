@@ -57,7 +57,7 @@ class ControlPanel(ttk.Frame):
 
         # Buttons container (camera + hardware)
         btns = ttk.Frame(self)
-        btns.pack(fill="x", pady=(0, 15))
+        btns.pack(fill="x", pady=(0, 8))
 
         # Camera controls
         CameraControls(
@@ -65,7 +65,7 @@ class ControlPanel(ttk.Frame):
             camera=self.camera,
             on_status=self.on_status,
             status_text=self._status_var()
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", pady=(0, 2))
 
         # Hardware controls
         HardwareControls(
@@ -75,27 +75,27 @@ class ControlPanel(ttk.Frame):
             on_laser=self.on_laser,
             status_text=self._status_var(),
             on_auto_tracking_toggle=self.on_auto_tracking_toggle
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", pady=(0, 2))
 
         # Separator
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
+        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=6)
 
         # Status labels
         ttk.Label(
             self, text="System Status",
-            font=("Consolas", 12, "bold"), foreground=ACCENT_2
-        ).pack(anchor="w", pady=(0, 6))
+            font=("Consolas", 11, "bold"), foreground=ACCENT_2
+        ).pack(anchor="w", pady=(0, 4))
 
         ttk.Label(self, textvariable=self._status_var(), foreground="#9aa4b1").pack(anchor="w")
 
-        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
+        ttk.Separator(self, orient="horizontal").pack(fill="x", pady=6)
 
         # Object Detection Toggle
         if self.on_toggle_tracking is not None:
             ttk.Label(
                 self, text="Object Detection",
-                font=("Consolas", 12, "bold"), foreground=ACCENT_2
-            ).pack(anchor="w", pady=(0, 6))
+                font=("Consolas", 11, "bold"), foreground=ACCENT_2
+            ).pack(anchor="w", pady=(0, 4))
             
             # BooleanVar to track checkbox state
             self.tracking_var = tk.BooleanVar(value=False)  # Disabled by default
@@ -107,20 +107,20 @@ class ControlPanel(ttk.Frame):
                 variable=self.tracking_var,
                 command=self._on_tracking_toggle
             )
-            tracking_check.pack(anchor="w", pady=(0, 10))
+            tracking_check.pack(anchor="w", pady=(0, 6))
             
-            ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
+            ttk.Separator(self, orient="horizontal").pack(fill="x", pady=6)
 
         # Narration Period Controls
         if self.on_start_narration is not None or self.on_end_narration is not None:
             ttk.Label(
                 self, text="Vision Narration",
-                font=("Consolas", 12, "bold"), foreground=ACCENT_2
-            ).pack(anchor="w", pady=(0, 6))
+                font=("Consolas", 11, "bold"), foreground=ACCENT_2
+            ).pack(anchor="w", pady=(0, 4))
             
             # Narration period buttons frame
             narration_frame = ttk.Frame(self)
-            narration_frame.pack(fill="x", pady=(0, 6))
+            narration_frame.pack(fill="x", pady=(0, 4))
             
             if self.on_start_narration is not None:
                 self.start_btn = ttk.Button(
@@ -147,9 +147,9 @@ class ControlPanel(ttk.Frame):
                 foreground="#9aa4b1",
                 font=("Arial", 9)
             )
-            self.narration_status.pack(anchor="w", pady=(0, 10))
+            self.narration_status.pack(anchor="w", pady=(0, 6))
             
-            ttk.Separator(self, orient="horizontal").pack(fill="x", pady=12)
+            ttk.Separator(self, orient="horizontal").pack(fill="x", pady=6)
     
     def _on_start_narration(self):
         """Callback when Start Narration Period button is clicked."""

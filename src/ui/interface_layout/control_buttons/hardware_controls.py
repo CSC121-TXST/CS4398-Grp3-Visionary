@@ -50,7 +50,7 @@ class HardwareControls(ttk.Frame):
             self, text="Connect Hardware",
             style="Accent.TButton", command=self._connect_hardware
         )
-        self.connect_btn.pack(fill="x", pady=4)
+        self.connect_btn.pack(fill="x", pady=2)
 
         # Holder frame for controls that only make sense when connected
         self._connected_controls = None
@@ -253,17 +253,17 @@ class HardwareControls(ttk.Frame):
             laser_frame, text=f"Laser: {laser_status}",
             style="Accent.TButton", command=self._laser_toggle
         )
-        self._laser_btn.pack(fill="x", pady=4)
+        self._laser_btn.pack(fill="x", pady=2)
 
-        ttk.Separator(self._connected_controls, orient="horizontal").pack(fill="x", pady=8)
+        ttk.Separator(self._connected_controls, orient="horizontal").pack(fill="x", pady=4)
 
         # Servo Control Section
         servo_frame = ttk.LabelFrame(self._connected_controls, text="Servo Control")
-        servo_frame.pack(fill="x", pady=(0, 8))
+        servo_frame.pack(fill="x", pady=(0, 4))
 
         # Auto-Tracking Toggle
         auto_frame = ttk.Frame(servo_frame)
-        auto_frame.pack(fill="x", pady=(4, 8))
+        auto_frame.pack(fill="x", pady=(2, 4))
         ttk.Label(auto_frame, text="Auto-Tracking:").pack(side="left", padx=(0, 8))
         self._auto_tracking_var = tk.BooleanVar(value=self._auto_tracking_enabled)
         self._auto_tracking_check = ttk.Checkbutton(
@@ -274,7 +274,7 @@ class HardwareControls(ttk.Frame):
 
         # Manual Pan Control
         pan_row = ttk.Frame(servo_frame)
-        pan_row.pack(fill="x", pady=(2, 4))
+        pan_row.pack(fill="x", pady=(1, 2))
         ttk.Label(pan_row, text="Pan (L-R):").pack(side="left")
         self._pan_var = tk.IntVar(value=90)
         self._pan_slider = ttk.Scale(
@@ -287,7 +287,7 @@ class HardwareControls(ttk.Frame):
 
         # Manual Tilt Control
         tilt_row = ttk.Frame(servo_frame)
-        tilt_row.pack(fill="x", pady=(2, 8))
+        tilt_row.pack(fill="x", pady=(1, 4))
         ttk.Label(tilt_row, text="Tilt (U-D):").pack(side="left")
         self._tilt_var = tk.IntVar(value=90)
         self._tilt_slider = ttk.Scale(
@@ -298,15 +298,15 @@ class HardwareControls(ttk.Frame):
         self._tilt_lbl = ttk.Label(tilt_row, text="90°")
         self._tilt_lbl.pack(side="left")
 
-        ttk.Separator(servo_frame, orient="horizontal").pack(fill="x", pady=8)
+        ttk.Separator(servo_frame, orient="horizontal").pack(fill="x", pady=4)
 
         # Offset Adjustment Section
         offset_frame = ttk.LabelFrame(servo_frame, text="Offset Adjustment")
-        offset_frame.pack(fill="x", pady=(4, 8))
+        offset_frame.pack(fill="x", pady=(2, 4))
         
         # Pan Offset Control
         pan_offset_row = ttk.Frame(offset_frame)
-        pan_offset_row.pack(fill="x", pady=(4, 2))
+        pan_offset_row.pack(fill="x", pady=(2, 1))
         ttk.Label(pan_offset_row, text="Pan Offset:").pack(side="left", padx=(0, 8))
         self._pan_offset_var = tk.IntVar(value=self._pan_offset)
         pan_offset_spin = ttk.Spinbox(
@@ -319,7 +319,7 @@ class HardwareControls(ttk.Frame):
         
         # Tilt Offset Control
         tilt_offset_row = ttk.Frame(offset_frame)
-        tilt_offset_row.pack(fill="x", pady=(2, 4))
+        tilt_offset_row.pack(fill="x", pady=(1, 2))
         ttk.Label(tilt_offset_row, text="Tilt Offset:").pack(side="left", padx=(0, 8))
         self._tilt_offset_var = tk.IntVar(value=self._tilt_offset)
         tilt_offset_spin = ttk.Spinbox(
@@ -334,15 +334,15 @@ class HardwareControls(ttk.Frame):
         ttk.Button(
             offset_frame, text="Save Offsets",
             command=self._save_offsets
-        ).pack(fill="x", pady=(4, 0))
+        ).pack(fill="x", pady=(2, 0))
 
-        ttk.Separator(self._connected_controls, orient="horizontal").pack(fill="x", pady=8)
+        ttk.Separator(self._connected_controls, orient="horizontal").pack(fill="x", pady=4)
 
         # Disconnect Button
         ttk.Button(
             self._connected_controls, text="Disconnect",
             style="Accent.TButton", command=self._disconnect_hardware
-        ).pack(fill="x", pady=4)
+        ).pack(fill="x", pady=2)
 
     # ---- Servo actions ----
     def _on_auto_tracking_toggle(self):

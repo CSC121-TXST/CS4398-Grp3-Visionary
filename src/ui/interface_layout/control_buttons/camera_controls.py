@@ -14,12 +14,12 @@ class CameraControls(ttk.Frame):
         ttk.Button(
             self, text="Start Camera",
             style="Accent.TButton", command=self._start_camera
-        ).pack(fill="x", pady=4)
+        ).pack(fill="x", pady=2)
 
         ttk.Button(
             self, text="Stop Camera",
             style="Accent.TButton", command=self._stop_camera
-        ).pack(fill="x", pady=4)
+        ).pack(fill="x", pady=2)
 
     def _start_camera(self):
         if not self.camera:

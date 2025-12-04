@@ -14,6 +14,7 @@ from ui.interface_layout.video_panel import VideoPanel
 
 from ui.interface_layout.control_panel import ControlPanel
 from ui.interface_layout.narration_panel import NarrationPanel
+from ui.interface_layout.scrollable_frame import ScrollableFrame
 from hardware.arduino_controller import ArduinoController
 
 # Tracking Module
@@ -116,8 +117,8 @@ class VisionaryApp(tk.Tk):
         main = ttk.Frame(self)
         main.pack(side=tk.TOP, fill="both", expand=True, padx=15, pady=15)
         
-        # Grid Configuration
-        main.grid_columnconfigure(0, weight=3)
+        # Grid Configuration (increased video feed size: 5:2 ratio)
+        main.grid_columnconfigure(0, weight=5)
         main.grid_columnconfigure(1, weight=2)
         main.grid_rowconfigure(0, weight=1)
 
@@ -160,8 +161,9 @@ class VisionaryApp(tk.Tk):
         # Sidebar Container
         sidebar = ttk.Frame(main)
         sidebar.grid(row=0, column=1, sticky="nsew")
+        sidebar.grid_rowconfigure(1, weight=1)  # Make scrollable area expandable
 
-        # Theme Header
+        # Theme Header (fixed at top)
         theme_frame = ttk.Frame(sidebar)
         theme_frame.pack(side=tk.TOP, fill="x", pady=(0, 10))
         
@@ -179,8 +181,13 @@ class VisionaryApp(tk.Tk):
         self.theme_switch = ToggleSwitch(theme_frame, command=on_toggle, bg=self.cget('bg'))
         self.theme_switch.pack(side=tk.RIGHT)
 
-        # Control Panel
-        self.control_frame = ttk.LabelFrame(sidebar, text="Control Panel", padding=10)
+        # Scrollable container for control panel and narration
+        scrollable_container = ScrollableFrame(sidebar)
+        scrollable_container.pack(side=tk.TOP, fill="both", expand=True)
+        content_frame = scrollable_container.get_content_frame()
+
+        # Control Panel (inside scrollable frame)
+        self.control_frame = ttk.LabelFrame(content_frame, text="Control Panel", padding=10)
         self.control_frame.pack(side=tk.TOP, fill="x", expand=False, pady=(0, 15))
 
         self._control_widget = ControlPanel(
@@ -196,10 +203,10 @@ class VisionaryApp(tk.Tk):
         )
         self._control_widget.pack(expand=True, fill="both")
         
-        # Narration Panel
+        # Narration Panel (inside scrollable frame)
         if self.narrator_available:
-            self.narration_panel = NarrationPanel(sidebar)
-            self.narration_panel.pack(side=tk.TOP, fill="both", expand=True)
+            self.narration_panel = NarrationPanel(content_frame)
+            self.narration_panel.pack(side=tk.TOP, fill="both", expand=True, pady=(0, 10))
     
     def _on_toggle_tracking(self, enabled: bool):
         """
