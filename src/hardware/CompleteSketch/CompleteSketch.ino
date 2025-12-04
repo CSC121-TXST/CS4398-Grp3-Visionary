@@ -15,16 +15,16 @@ int tiltAngle = 90;   // Center-ish
 bool laserOn  = false;
 bool autoMoveEnabled = true;  // Can toggle via serial
 
-// Limits (tune as needed so you don't smash your LEGO rig)
+// Limits (tune as needed so we don't smash the LEGO rig)
 const int PAN_MIN  = 30;
 const int PAN_MAX  = 150;
 const int TILT_MIN = 40;
 const int TILT_MAX = 140;
 
 // Offsets (to compensate for camera/laser not perfectly aligned)
-// You'll tweak these after a bit of live testing.
-int panOffsetDegrees  = 0;   // + right, - left
-int tiltOffsetDegrees = 5;   // + down, - up (aim a bit lower to avoid eyes)
+// These can now be changed LIVE from the app via the "O,panOffset,tiltOffset" command.
+int panOffsetDegrees  = 0;   // + right, - left (logical)
+int tiltOffsetDegrees = 0;   // + down, - up (logical)
 
 void setup() {
   Serial.begin(115200);
@@ -36,6 +36,12 @@ void setup() {
   // Initialize positions
   applyServoAngles();
   digitalWrite(LASER_PIN, LOW);
+
+  Serial.println("Visionary Servo Controller Ready");
+  Serial.print("OFFSETS,");
+  Serial.print(panOffsetDegrees);
+  Serial.print(",");
+  Serial.println(tiltOffsetDegrees);
 }
 
 void loop() {
@@ -48,17 +54,20 @@ void loop() {
     }
   }
 
-  // You could add small smoothing/slow return here if you want.
-
   // Tiny delay just to not hammer the servos
   delay(5);
 }
 
 void handleCommand(const String& cmd) {
   // Commands:
-  //  "A,pan,tilt"  -> set pan/tilt angles (if autoMoveEnabled)
-  //  "L,0" / "L,1" -> laser off/on
-  //  "M,0" / "M,1" -> autoMove off/on
+  //  "A,pan,tilt"      -> set pan/tilt angles (if autoMoveEnabled)
+  //  "L,0" / "L,1"     -> laser off/on
+  //  "M,0" / "M,1"     -> autoMove off/on
+  //  "O,pan,tilt"      -> set panOffsetDegrees, tiltOffsetDegrees (in degrees)
+  //
+  // Example:
+  //  O,4,0     -> panOffset = +4°, tiltOffset = 0°
+  //  O,-2,3    -> panOffset = -2°, tiltOffset = +3°
 
   if (cmd.startsWith("A,")) {
     if (!autoMoveEnabled) return;
@@ -74,7 +83,7 @@ void handleCommand(const String& cmd) {
     int targetPan  = panStr.toInt();
     int targetTilt = tiltStr.toInt();
 
-    // Apply offsets so we correct for camera/laser mounting + aim a bit low
+    // Apply offsets so we correct for camera/laser mounting + safety tilt
     targetPan  += panOffsetDegrees;
     targetTilt += tiltOffsetDegrees;
 
@@ -101,6 +110,30 @@ void handleCommand(const String& cmd) {
     } else if (cmd.endsWith("0")) {
       autoMoveEnabled = false;
     }
+  }
+  else if (cmd.startsWith("O,")) {
+    // Offset update: O,panOffset,tiltOffset
+
+    int firstComma = cmd.indexOf(',');
+    int secondComma = cmd.indexOf(',', firstComma + 1);
+
+    // If only one value is provided, treat it as panOffset only
+    if (secondComma == -1) {
+      String panStr = cmd.substring(firstComma + 1);
+      panOffsetDegrees = panStr.toInt();
+    } else {
+      String panStr  = cmd.substring(firstComma + 1, secondComma);
+      String tiltStr = cmd.substring(secondComma + 1);
+
+      panOffsetDegrees  = panStr.toInt();
+      tiltOffsetDegrees = tiltStr.toInt();
+    }
+
+    // Echo back for debugging
+    Serial.print("OFFSETS,");
+    Serial.print(panOffsetDegrees);
+    Serial.print(",");
+    Serial.println(tiltOffsetDegrees);
   }
 }
 
