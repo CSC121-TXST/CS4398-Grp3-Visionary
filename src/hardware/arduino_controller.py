@@ -113,6 +113,58 @@ class ArduinoController:
         # CompleteSketch uses M,0/1 for mode toggle (not AUTO,)
         self.send_command(f"M,{1 if enabled else 0}")
 
+    # --- Offset control methods ---
+    def set_offset(self, pan_offset: int, tilt_offset: int):
+        """
+        Set pan and tilt offset values on Arduino.
+        These offsets are applied to all servo commands to compensate for
+        camera/laser mounting misalignment.
+        
+        Args:
+            pan_offset: Pan offset in degrees (+ right, - left)
+            tilt_offset: Tilt offset in degrees (+ down, - up)
+        """
+        pan_offset = int(pan_offset)
+        tilt_offset = int(tilt_offset)
+        self.send_command(f"O,{pan_offset},{tilt_offset}")
+
+    def read_offset(self) -> tuple[int, int]:
+        """
+        Read current offset values from Arduino.
+        Arduino sends "OFFSETS,pan,tilt" on startup and after offset changes.
+        
+        This method attempts to read any pending OFFSETS message from the serial buffer.
+        It reads multiple lines to catch the startup message.
+        
+        Returns:
+            (pan_offset, tilt_offset) tuple, or (0, 0) if unable to read
+        """
+        if not self.is_connected():
+            return (0, 0)
+        
+        try:
+            # Read multiple lines to catch startup message
+            for _ in range(10):  # Read up to 10 lines
+                if self.arduino.in_waiting > 0:
+                    # Read a line (Arduino sends newline-terminated messages)
+                    line = self.arduino.readline().decode('utf-8', errors='ignore').strip()
+                    if line.startswith("OFFSETS,"):
+                        # Parse OFFSETS,pan,tilt
+                        parts = line.split(',')
+                        if len(parts) >= 3:
+                            try:
+                                pan_offset = int(parts[1])
+                                tilt_offset = int(parts[2])
+                                return (pan_offset, tilt_offset)
+                            except ValueError:
+                                pass
+                else:
+                    break  # No more data available
+        except Exception:
+            pass
+        
+        return (0, 0)
+
     # --- Legacy servo helpers for backwards compatibility ---
     def servo_start(self):
         """Legacy: not used by CompleteSketch, but kept for compatibility."""

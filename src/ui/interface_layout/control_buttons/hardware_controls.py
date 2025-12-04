@@ -1,6 +1,12 @@
 # ui/controls/hardware_controls.py
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from hardware.config_manager import HardwareConfig
 
 class HardwareControls(ttk.Frame):
     """
@@ -31,6 +37,13 @@ class HardwareControls(ttk.Frame):
         self._auto_tracking_enabled = True
         self._pan_after_id = None
         self._tilt_after_id = None
+        
+        # Initialize config manager for saving/loading offsets
+        self.config = HardwareConfig()
+        
+        # Load saved offsets from config
+        self._pan_offset, self._tilt_offset = self.config.get_offsets()
+        self._offset_after_id = None  # for offset change debounce
 
         # Connect button (appears initially; replaced after connect)
         self.connect_btn = ttk.Button(
@@ -151,6 +164,14 @@ class HardwareControls(ttk.Frame):
             if self.arduino and self.arduino.is_connected():
                 if hasattr(self.arduino, "set_auto_tracking_mode"):
                     self.arduino.set_auto_tracking_mode(True)
+                
+                # Apply saved offsets to Arduino first
+                if hasattr(self.arduino, "set_offset"):
+                    self.arduino.set_offset(self._pan_offset, self._tilt_offset)
+                
+                # Try to read offsets from Arduino (it sends OFFSETS,pan,tilt on startup)
+                # Wait a bit for Arduino to send the startup message
+                self.after(200, self._try_read_arduino_offsets)
         except Exception:
             pass  # Ignore errors during initialization
 
@@ -277,6 +298,44 @@ class HardwareControls(ttk.Frame):
         self._tilt_lbl = ttk.Label(tilt_row, text="90°")
         self._tilt_lbl.pack(side="left")
 
+        ttk.Separator(servo_frame, orient="horizontal").pack(fill="x", pady=8)
+
+        # Offset Adjustment Section
+        offset_frame = ttk.LabelFrame(servo_frame, text="Offset Adjustment")
+        offset_frame.pack(fill="x", pady=(4, 8))
+        
+        # Pan Offset Control
+        pan_offset_row = ttk.Frame(offset_frame)
+        pan_offset_row.pack(fill="x", pady=(4, 2))
+        ttk.Label(pan_offset_row, text="Pan Offset:").pack(side="left", padx=(0, 8))
+        self._pan_offset_var = tk.IntVar(value=self._pan_offset)
+        pan_offset_spin = ttk.Spinbox(
+            pan_offset_row, from_=-30, to=30, width=8,
+            textvariable=self._pan_offset_var, command=self._on_offset_changed
+        )
+        pan_offset_spin.pack(side="left", padx=(0, 4))
+        pan_offset_spin.bind('<KeyRelease>', lambda e: self._on_offset_changed())
+        ttk.Label(pan_offset_row, text="° (+ right, - left)").pack(side="left")
+        
+        # Tilt Offset Control
+        tilt_offset_row = ttk.Frame(offset_frame)
+        tilt_offset_row.pack(fill="x", pady=(2, 4))
+        ttk.Label(tilt_offset_row, text="Tilt Offset:").pack(side="left", padx=(0, 8))
+        self._tilt_offset_var = tk.IntVar(value=self._tilt_offset)
+        tilt_offset_spin = ttk.Spinbox(
+            tilt_offset_row, from_=-30, to=30, width=8,
+            textvariable=self._tilt_offset_var, command=self._on_offset_changed
+        )
+        tilt_offset_spin.pack(side="left", padx=(0, 4))
+        tilt_offset_spin.bind('<KeyRelease>', lambda e: self._on_offset_changed())
+        ttk.Label(tilt_offset_row, text="° (+ down, - up)").pack(side="left")
+        
+        # Save Offset Button
+        ttk.Button(
+            offset_frame, text="Save Offsets",
+            command=self._save_offsets
+        ).pack(fill="x", pady=(4, 0))
+
         ttk.Separator(self._connected_controls, orient="horizontal").pack(fill="x", pady=8)
 
         # Disconnect Button
@@ -370,3 +429,93 @@ class HardwareControls(ttk.Frame):
             self.on_status(f"Servo: Pan={pan}°, Tilt={tilt}°")
         except Exception as e:
             messagebox.showerror("Visionary", f"Set servo angle failed:\n{e}")
+    
+    # ---- Offset control methods ----
+    def _try_read_arduino_offsets(self):
+        """Try to read offset values from Arduino serial output.
+        
+        Arduino sends "OFFSETS,pan,tilt" on startup and after offset changes.
+        This method attempts to parse that response using the ArduinoController's read_offset method.
+        """
+        if not self.arduino or not self.arduino.is_connected():
+            return
+        
+        try:
+            # Use ArduinoController's read_offset method if available
+            if hasattr(self.arduino, "read_offset"):
+                pan_offset, tilt_offset = self.arduino.read_offset()
+                if pan_offset != 0 or tilt_offset != 0:  # Only update if we got non-zero values
+                    # Update UI and internal state
+                    self._pan_offset = pan_offset
+                    self._tilt_offset = tilt_offset
+                    if hasattr(self, "_pan_offset_var"):
+                        self._pan_offset_var.set(pan_offset)
+                    if hasattr(self, "_tilt_offset_var"):
+                        self._tilt_offset_var.set(tilt_offset)
+                    # Update config to match Arduino
+                    self.config.save_offsets(pan_offset, tilt_offset)
+        except Exception:
+            pass  # Ignore errors when reading serial
+    
+    def _on_offset_changed(self):
+        """Handle offset value changes (debounced)."""
+        if not self.arduino or not self.arduino.is_connected():
+            return
+        
+        # Debounce to avoid spamming the serial line
+        if self._offset_after_id:
+            try:
+                self.after_cancel(self._offset_after_id)
+            except Exception:
+                pass
+        
+        self._offset_after_id = self.after(300, self._apply_offset_changes)
+    
+    def _apply_offset_changes(self):
+        """Apply offset changes to Arduino."""
+        self._offset_after_id = None
+        if not self.arduino or not self.arduino.is_connected():
+            return
+        
+        try:
+            pan_offset = int(self._pan_offset_var.get())
+            tilt_offset = int(self._tilt_offset_var.get())
+            
+            # Clamp values to reasonable range
+            pan_offset = max(-30, min(30, pan_offset))
+            tilt_offset = max(-30, min(30, tilt_offset))
+            
+            # Update internal state
+            self._pan_offset = pan_offset
+            self._tilt_offset = tilt_offset
+            
+            # Send to Arduino
+            if hasattr(self.arduino, "set_offset"):
+                self.arduino.set_offset(pan_offset, tilt_offset)
+            
+            self.status_text.set(f"Offset: Pan={pan_offset}°, Tilt={tilt_offset}°")
+            self.on_status(f"Offset: Pan={pan_offset}°, Tilt={tilt_offset}°")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Set offset failed:\n{e}")
+    
+    def _save_offsets(self):
+        """Save current offset values to config file."""
+        try:
+            pan_offset = int(self._pan_offset_var.get())
+            tilt_offset = int(self._tilt_offset_var.get())
+            
+            # Clamp values
+            pan_offset = max(-30, min(30, pan_offset))
+            tilt_offset = max(-30, min(30, tilt_offset))
+            
+            # Save to config
+            self.config.save_offsets(pan_offset, tilt_offset)
+            
+            # Update internal state
+            self._pan_offset = pan_offset
+            self._tilt_offset = tilt_offset
+            
+            self.status_text.set(f"Offsets saved: Pan={pan_offset}°, Tilt={tilt_offset}°")
+            self.on_status(f"Offsets saved: Pan={pan_offset}°, Tilt={tilt_offset}°")
+        except Exception as e:
+            messagebox.showerror("Visionary", f"Save offsets failed:\n{e}")
