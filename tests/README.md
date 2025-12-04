@@ -10,10 +10,15 @@ tests/
 ├── conftest.py              # Shared fixtures and configuration
 ├── unit/                    # Unit tests for individual components
 │   ├── test_tracking.py     # ObjectTracker tests
+│   ├── test_camera_control.py  # Camera control tests
 │   ├── test_llm_integration.py  # LLM client tests
 │   ├── test_vision_narrator.py  # Vision Narrator tests
 │   ├── test_event_logger.py     # Event Logger tests
-│   └── test_tts_engine.py       # TTS Engine tests
+│   ├── test_tts_engine.py       # TTS Engine tests
+│   ├── test_arduino_controller.py  # ArduinoController tests
+│   ├── test_target_selector.py    # TargetSelector tests
+│   ├── test_servo_tracking.py     # ServoTracker tests
+│   └── test_config_manager.py     # HardwareConfig tests
 ├── integration/             # Integration tests
 │   ├── test_tracking_narration_integration.py
 │   └── test_ui_integration.py

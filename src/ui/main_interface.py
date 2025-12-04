@@ -1,5 +1,26 @@
 """
-Main Interface module/window that assembles the pieces.
+Main Interface Module
+
+This module contains the main application window (VisionaryApp) that orchestrates
+all components of the Visionary system.
+
+Architecture:
+    VisionaryApp (Main Window)
+    ├── VideoPanel (Camera feed + Object tracking)
+    ├── ControlPanel (Hardware controls, camera controls)
+    ├── NarrationPanel (AI narration display)
+    ├── StatusBar (System status indicators)
+    └── MenuBar (Settings, performance modes)
+
+Component Integration:
+    - ObjectTracker: YOLOv8 + DeepSORT for object detection and tracking
+    - ServoTracker: Converts camera coordinates to servo angles
+    - TargetSelector: Intelligent target selection from multiple objects
+    - ArduinoController: Serial communication with hardware
+    - VisionNarrator: AI-powered scene description
+
+Data Flow:
+    Camera → ObjectTracker → TargetSelector → ServoTracker → ArduinoController → Servos
 """
 
 import tkinter as tk
@@ -14,6 +35,7 @@ from ui.interface_layout.video_panel import VideoPanel
 
 from ui.interface_layout.control_panel import ControlPanel
 from ui.interface_layout.narration_panel import NarrationPanel
+from ui.interface_layout.scrollable_frame import ScrollableFrame
 from hardware.arduino_controller import ArduinoController
 
 # Tracking Module
@@ -58,21 +80,33 @@ class ToggleSwitch(tk.Canvas):
         self.create_oval(cx-8, 4, cx+8, 20, fill=fg, outline=fg)
 
 class VisionaryApp(tk.Tk):
-    """Main Tkinter window for the Visionary application."""
+    """
+    Main Tkinter window for the Visionary application.
+    
+    This class orchestrates all system components:
+    - Camera capture and video display
+    - Object detection and tracking
+    - Servo motor control for automatic tracking
+    - AI-powered scene narration
+    - Hardware control (laser, servos, Arduino)
+    """
+    
     def __init__(self):
         super().__init__()
         self.title("Visionary")
         self.geometry("1100x650")
         self.minsize(980, 560)
 
-        # Apply dark theme before creating widgets
+        # === Theme Initialization ===
+        # Apply dark theme before creating widgets (affects all child widgets)
         apply_theme(self)
 
-        # Debug flag
+        # === Debug Configuration ===
         self.debug_enabled = False
 
+        # === Object Tracker Initialization ===
         # Initialize ObjectTracker before building UI
-        # This creates the tracker once and reuses it throughout the app
+        # This creates the tracker once and reuses it throughout the app lifecycle
         self.tracker = ObjectTracker(
             model_path="yolov8n.pt",
             conf=0.20,  # Lower confidence (0.20) for better detection of small objects like phones/books
@@ -82,7 +116,9 @@ class VisionaryApp(tk.Tk):
         if hasattr(self.tracker, "set_debug"):
             self.tracker.set_debug(self.debug_enabled)
 
+        # === AI Narrator Initialization ===
         # Initialize Vision Narrator (requires OpenAI API key)
+        # If initialization fails, narration features are disabled but app continues
         try:
             self.narrator = VisionNarrator()
             self.narrator_available = True
@@ -93,7 +129,8 @@ class VisionaryApp(tk.Tk):
             self.narrator = None
             self.narrator_available = False
 
-        # Build UI 
+        # === UI Construction ===
+        # Build menu bar with settings and controls
         build_menubar(
             self,
             on_exit=self.on_exit,
@@ -104,24 +141,38 @@ class VisionaryApp(tk.Tk):
         )
         build_title(self)
 
-        self._build_main_area()      # video + control panel
-        self._build_statusbar()      # footer
+        # Build main content area (video panel + control panel)
+        self._build_main_area()
         
+        # Build status bar (footer with FPS, tracking count, etc.)
+        self._build_statusbar()
+        
+        # === UI State Synchronization ===
         # Sync UI checkboxes with initial tracker classes after UI is built
         # This ensures the menu reflects the actual tracker state (person, cell phone, book)
+        # Use after() to ensure UI is fully constructed first
         self.after(100, self._sync_detection_classes_ui)
 
     def _build_main_area(self):
-        # Main Layout Container
+        """
+        Build the main content area with video panel and control sidebar.
+        
+        Layout:
+        - Left: Video panel (5/7 of width) - camera feed with tracking overlay
+        - Right: Sidebar (2/7 of width) - controls, narration, theme toggle
+        """
+        # === Main Layout Container ===
         main = ttk.Frame(self)
         main.pack(side=tk.TOP, fill="both", expand=True, padx=15, pady=15)
         
-        # Grid Configuration
-        main.grid_columnconfigure(0, weight=3)
-        main.grid_columnconfigure(1, weight=2)
+        # === Grid Configuration ===
+        # Video feed takes 5 parts, sidebar takes 2 parts (5:2 ratio)
+        main.grid_columnconfigure(0, weight=5)  # Video panel
+        main.grid_columnconfigure(1, weight=2)   # Sidebar
         main.grid_rowconfigure(0, weight=1)
 
-        # Video Panel
+        # === Video Panel (Left Side) ===
+        # Displays camera feed with object tracking overlay
         self.video_panel = VideoPanel(
             parent=main,
             on_fps=lambda f: self.status.var_fps.set(f"FPS: {f:4.1f}"),
@@ -132,55 +183,68 @@ class VisionaryApp(tk.Tk):
         )
         self.video_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 15), pady=0)
 
-        # Hardware Controller
+        # === Hardware Controller Initialization ===
+        # Initialize Arduino controller for servo and laser control
         self.arduino = ArduinoController()
         
-        # Initialize ServoTracker for automatic target tracking
+        # === Servo Tracking System Initialization ===
+        # ServoTracker: Converts camera coordinates to servo angles
         # Default image size will be updated from actual camera frames
         self.servo_tracker = ServoTracker(
             image_width=640,
             image_height=480,
-            pan_range=(30, 150),
+            pan_range=(30, 150),      # Servo angle limits (safety constraints)
             tilt_range=(40, 140),
-            offset_vertical=0.15  # Aim 15% below center mass for safety
+            offset_vertical=0.15      # Aim 15% below center mass for safety
         )
         
-        # Initialize TargetSelector for intelligent target selection
+        # TargetSelector: Intelligent target selection from multiple objects
+        # Handles priority scoring, persistence, and prevents target bouncing
         self.target_selector = TargetSelector(
-            persistence_frames=10,  # Keep tracking target for 10 frames after it's lost
-            priority_threshold=20.0,  # Need 20+ priority difference to switch targets
-            center_weight=0.3,  # 30% weight for center proximity
-            size_weight=0.4,  # 40% weight for size
-            confidence_weight=0.2,  # 20% weight for confidence
-            class_weight=0.1,  # 10% weight for class priority
+            persistence_frames=10,      # Keep tracking target for 10 frames after it's lost
+            priority_threshold=20.0,    # Need 20+ priority difference to switch targets
+            center_weight=0.3,          # 30% weight for center proximity
+            size_weight=0.4,            # 40% weight for size
+            confidence_weight=0.2,      # 20% weight for confidence
+            class_weight=0.1,           # 10% weight for class priority
         )
         
-        self._auto_tracking_active = True  # Enabled by default when auto-tracking mode is on
+        # Auto-tracking state (enabled by default)
+        self._auto_tracking_active = True
 
-        # Sidebar Container
+        # === Sidebar Container (Right Side) ===
         sidebar = ttk.Frame(main)
         sidebar.grid(row=0, column=1, sticky="nsew")
+        sidebar.grid_rowconfigure(1, weight=1)  # Make scrollable area expandable
 
-        # Theme Header
+        # === Theme Toggle (Fixed at Top) ===
         theme_frame = ttk.Frame(sidebar)
         theme_frame.pack(side=tk.TOP, fill="x", pady=(0, 10))
         
         lbl_mode = ttk.Label(theme_frame, text="Dark Mode", font=("Segoe UI", 10, "bold"))
         lbl_mode.pack(side=tk.RIGHT, padx=(10, 0))
         
-        # Theme Toggle Logic
+        # Theme toggle callback
         def on_toggle():
             is_dark = toggle_theme(self)
             lbl_mode.config(text="Dark Mode" if is_dark else "Light Mode")
             
+            # Update toggle switch background to match new theme
             new_bg = self.cget("bg")
             self.theme_switch.config(bg=new_bg)
             
         self.theme_switch = ToggleSwitch(theme_frame, command=on_toggle, bg=self.cget('bg'))
         self.theme_switch.pack(side=tk.RIGHT)
 
-        # Control Panel
-        self.control_frame = ttk.LabelFrame(sidebar, text="Control Panel", padding=10)
+        # === Scrollable Content Area ===
+        # Contains control panel and narration panel (scrollable if content overflows)
+        scrollable_container = ScrollableFrame(sidebar)
+        scrollable_container.pack(side=tk.TOP, fill="both", expand=True)
+        content_frame = scrollable_container.get_content_frame()
+
+        # === Control Panel ===
+        # Hardware controls (camera, Arduino, tracking, narration)
+        self.control_frame = ttk.LabelFrame(content_frame, text="Control Panel", padding=10)
         self.control_frame.pack(side=tk.TOP, fill="x", expand=False, pady=(0, 15))
 
         self._control_widget = ControlPanel(
@@ -196,10 +260,11 @@ class VisionaryApp(tk.Tk):
         )
         self._control_widget.pack(expand=True, fill="both")
         
-        # Narration Panel
+        # === Narration Panel ===
+        # Displays AI-generated scene descriptions (only if narrator is available)
         if self.narrator_available:
-            self.narration_panel = NarrationPanel(sidebar)
-            self.narration_panel.pack(side=tk.TOP, fill="both", expand=True)
+            self.narration_panel = NarrationPanel(content_frame)
+            self.narration_panel.pack(side=tk.TOP, fill="both", expand=True, pady=(0, 10))
     
     def _on_toggle_tracking(self, enabled: bool):
         """
