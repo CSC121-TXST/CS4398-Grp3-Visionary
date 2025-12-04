@@ -23,7 +23,8 @@ class ControlPanel(ttk.Frame):
         on_laser=None,
         on_toggle_tracking: Optional[Callable[[bool], None]] = None,
         on_start_narration: Optional[Callable[[], None]] = None,
-        on_end_narration: Optional[Callable[[], None]] = None
+        on_end_narration: Optional[Callable[[], None]] = None,
+        on_auto_tracking_toggle: Optional[Callable[[bool], None]] = None
     ):
         """
         Initialize ControlPanel.
@@ -43,6 +44,7 @@ class ControlPanel(ttk.Frame):
         self.on_toggle_tracking = on_toggle_tracking
         self.on_start_narration = on_start_narration
         self.on_end_narration = on_end_narration
+        self.on_auto_tracking_toggle = on_auto_tracking_toggle
 
         self._build()
 
@@ -71,7 +73,8 @@ class ControlPanel(ttk.Frame):
             arduino=self.arduino,
             on_status=self.on_status,
             on_laser=self.on_laser,
-            status_text=self._status_var()
+            status_text=self._status_var(),
+            on_auto_tracking_toggle=self.on_auto_tracking_toggle
         ).pack(fill="x", pady=(0, 4))
 
         # Separator
